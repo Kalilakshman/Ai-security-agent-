@@ -26,7 +26,7 @@ def sample_config():
     return AppConfig(
         openrouter=OpenRouterConfig(
             api_key="sk-or-v1-testkey1234567890",
-            default_model="nvidia/llama-3.1-nemotron-70b-instruct:free",
+            default_model="nvidia/nemotron-3-ultra-550b-a55b:free",
         ),
         executor=ExecutorConfig(default_timeout_seconds=5.0),
         logging=LoggingConfig(level="DEBUG")
@@ -45,7 +45,7 @@ def temp_yaml_file():
     content = """
 openrouter:
   api_key: "sk-or-v1-yamlkey999"
-  default_model: "nvidia/llama-3.1-nemotron-70b-instruct:free"
+  default_model: "nvidia/nemotron-3-ultra-550b-a55b:free"
   temperature: 0.5
 
 executor:

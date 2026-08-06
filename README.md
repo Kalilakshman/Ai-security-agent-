@@ -122,7 +122,7 @@ Or edit `config/config.yaml`:
 ```yaml
 openrouter:
   api_key: "your-openrouter-api-key-here"
-  default_model: "nvidia/llama-3.1-nemotron-70b-instruct:free"
+  default_model: "nvidia/nemotron-3-ultra-550b-a55b:free"
 ```
 
 ---
