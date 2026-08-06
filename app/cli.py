@@ -254,8 +254,11 @@ def plan_assessment(
         with console.status("[bold green]Executing security workflow steps...[/bold green]"):
             result = engine.execute_plan(plan, authorized=True)
 
-        # Save Scan Record to SQLite Persistence
+        # Save Scan Record to SQLite Persistence & Write JSON File
         from memory.database import get_db_engine
+        import json
+        from pathlib import Path
+
         db = get_db_engine(cfg.database.db_url)
         db.save_scan(
             target=result.target,
@@ -266,13 +269,18 @@ def plan_assessment(
             summary=result.summary
         )
 
+        clean_target = result.target.replace("://", "_").replace("/", "_").replace(":", "_")
+        json_filename = f"scan_{clean_target}.json"
+        with open(json_filename, "w", encoding="utf-8") as f:
+            json.dump(result.model_dump(), f, indent=2)
+
         console.print(Panel(
             f"[green]Workflow Execution Completed Successfully![/green]\n"
             f"Target: {result.target}\n"
             f"Steps Executed: {result.summary['steps_executed']}\n"
             f"Total Wall-Clock Time: {result.total_duration_ms:.2f} ms\n"
             f"Total Findings Discovered: {result.summary['total_findings']}\n"
-            f"[dim]Scan record persisted to SQLite database.[/dim]",
+            f"[dim]Scan record persisted to SQLite database and written to '{json_filename}'.[/dim]",
             title="✅ Scan Complete",
             expand=False
         ))
