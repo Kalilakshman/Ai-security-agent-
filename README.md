@@ -121,8 +121,8 @@ export OPENROUTER_API_KEY="sk-or-v1-your-key-here"
 Or edit `config/config.yaml`:
 ```yaml
 openrouter:
-  api_key: "sk-or-v1-your-key-here"
-  default_model: "meta-llama/llama-3.3-70b-instruct:free"
+  api_key: "your-openrouter-api-key-here"
+  default_model: "nvidia/llama-3.1-nemotron-70b-instruct:free"
 ```
 
 ---

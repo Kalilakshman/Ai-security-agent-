@@ -2,7 +2,7 @@
 OpenRouter API Client for LLM completions.
 
 Reads API key from OPENROUTER_API_KEY environment variable or AppConfig YAML settings.
-Allows dynamic model selection with configurable defaults (e.g., meta-llama/llama-3.3-70b-instruct:free).
+Allows dynamic model selection with configurable defaults (e.g., nvidia/llama-3.1-nemotron-70b-instruct:free).
 """
 
 import os

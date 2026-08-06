@@ -31,7 +31,7 @@ def test_cli_config(cli_runner):
     assert result.exit_code == 0
     assert "Active Configuration Settings" in result.output
     assert "OpenRouter LLM Backend" in result.output
-    assert "meta-llama/llama-3.3-70b-instruct:free" in result.output
+    assert "nvidia/llama-3.1-nemotron-70b-instruct:free" in result.output
 
 
 def test_cli_plugins(cli_runner):

@@ -24,7 +24,7 @@ class OpenRouterConfig(BaseModel):
         description="OpenRouter API v1 base endpoint."
     )
     default_model: str = Field(
-        default="meta-llama/llama-3.3-70b-instruct:free",
+        default="nvidia/llama-3.1-nemotron-70b-instruct:free",
         description="Default free model to use on OpenRouter."
     )
     fallback_model: str = Field(
