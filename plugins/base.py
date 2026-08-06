@@ -68,7 +68,7 @@ class BasePlugin(ABC):
         """Short summary of tool capability."""
         pass
 
-    def is_installed((self) -> bool:
+    def is_installed(self) -> bool:
         """Check if binary executable is installed on host system PATH."""
         return shutil.which(self.name) is not None
 

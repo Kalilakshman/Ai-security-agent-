@@ -29,7 +29,7 @@ class DatabaseEngine:
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
         self.init_db()
 
-    def init_db((self) -> None:
+    def init_db(self) -> None:
         """Initialize database schema tables."""
         try:
             Base.metadata.create_all(bind=self.engine)
