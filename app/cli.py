@@ -64,11 +64,11 @@ def main(
 @app.command("doctor")
 def doctor(ctx: typer.Context):
     """Run environment, configuration, executor, and OpenRouter API diagnostic checks."""
-    console.print("[bold #00ffff]┌──[ SYSTEM DIAGNOSTICS & CORE SUBSYSTEM AUDIT ]──┐[/bold #00ffff]\n")
+    console.print("[bold #00ffff]┌──[ SYSTEM DIAGNOSTICS & CORE SUBSYSTEM AUDIT ]──┐[/]\n")
 
     cfg: AppConfig = ctx.obj["config"]
     table = Table(
-        title="[bold #00ff66]CYBER SUBSYSTEM STATUS[/bold #00ff66]",
+        title="[bold #00ff66]CYBER SUBSYSTEM STATUS[/]",
         box=box.DOUBLE_EDGE,
         header_style="bold #ff007f",
         border_style="#00ffff"
@@ -80,34 +80,34 @@ def doctor(ctx: typer.Context):
     # 1. Python Environment Check
     py_ver = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     if sys.version_info >= (3, 12):
-        table.add_row("Python Core Runtime", "[bold #00ff66][ONLINE][/bold #00ff66]", f"Python {py_ver}")
+        table.add_row("Python Core Runtime", "[bold #00ff66][ONLINE][/]", f"Python {py_ver}")
     else:
-        table.add_row("Python Core Runtime", "[bold #ffff00][DEGRADED][/bold #ffff00]", f"Python {py_ver} (3.12+ recommended)")
+        table.add_row("Python Core Runtime", "[bold #ffff00][DEGRADED][/]", f"Python {py_ver} (3.12+ recommended)")
 
     # 2. Config Loading Check
-    table.add_row("YAML Config Engine", "[bold #00ff66][ONLINE][/bold #00ff66]", f"Loaded default model: {cfg.openrouter.default_model}")
+    table.add_row("YAML Config Engine", "[bold #00ff66][ONLINE][/]", f"Loaded default model: {cfg.openrouter.default_model}")
 
     # 3. Subprocess Executor Check
     try:
         executor = SafeExecutor(default_timeout_seconds=5.0)
         res = executor.execute(["python", "--version"] if sys.platform != "win32" else ["cmd", "/c", "ver"])
         if res.is_success:
-            table.add_row("Subprocess Sandbox", "[bold #00ff66][ONLINE][/bold #00ff66]", "Safe execution engine operational")
+            table.add_row("Subprocess Sandbox", "[bold #00ff66][ONLINE][/]", "Safe execution engine operational")
         else:
-            table.add_row("Subprocess Sandbox", "[bold #ff0055][OFFLINE][/bold #ff0055]", f"Execution failed: {res.stderr.strip()}")
+            table.add_row("Subprocess Sandbox", "[bold #ff0055][OFFLINE][/]", f"Execution failed: {res.stderr.strip()}")
     except Exception as e:
-        table.add_row("Subprocess Sandbox", "[bold #ff0055][OFFLINE][/bold #ff0055]", str(e))
+        table.add_row("Subprocess Sandbox", "[bold #ff0055][OFFLINE][/]", str(e))
 
     # 4. OpenRouter API Health Check
     llm = OpenRouterLLMProvider(cfg.openrouter)
     api_ok = asyncio.run(llm.health_check())
     if api_ok:
-        table.add_row("OpenRouter AI Hub", "[bold #00ff66][ONLINE][/bold #00ff66]", f"Connected to OpenRouter API (Model: {cfg.openrouter.default_model})")
+        table.add_row("OpenRouter AI Hub", "[bold #00ff66][ONLINE][/]", f"Connected to OpenRouter API (Model: {cfg.openrouter.default_model})")
     else:
-        table.add_row("OpenRouter AI Hub", "[bold #ff0055][OFFLINE][/bold #ff0055]", "Unable to reach OpenRouter API or invalid API key")
+        table.add_row("OpenRouter AI Hub", "[bold #ff0055][OFFLINE][/]", "Unable to reach OpenRouter API or invalid API key")
 
     console.print(table)
-    console.print("\n[dim #00ffff]Diagnostic check sequence completed.[/dim #00ffff]\n")
+    console.print("\n[dim #00ffff]Diagnostic check sequence completed.[/]\n")
 
 
 @app.command("config")
@@ -116,43 +116,43 @@ def show_config(ctx: typer.Context):
     cfg: AppConfig = ctx.obj["config"]
 
     console.print(Panel(
-        "[bold #00ffff]⚙️ ACTIVE FRAMEWORK CONFIGURATION & BOUNDARIES[/bold #00ffff]",
+        "[bold #00ffff]⚙️ ACTIVE FRAMEWORK CONFIGURATION & BOUNDARIES[/]",
         border_style="#00ff66",
         box=box.DOUBLE,
         expand=False
     ))
     
-    tree = Tree("[bold #ff007f]AppConfig Core Root[/bold #ff007f]")
+    tree = Tree("[bold #ff007f]AppConfig Core Root[/]")
     
     # OpenRouter Node
-    or_node = tree.add("[bold #ffff00]OpenRouter LLM Neural Hub[/bold #ffff00]")
-    or_node.add(f"[#00ffff]Base URL:[/#00ffff] {cfg.openrouter.base_url}")
-    or_node.add(f"[#00ffff]Default Free Model:[/#00ffff] {cfg.openrouter.default_model}")
-    or_node.add(f"[#00ffff]Fallback Model:[/#00ffff] {cfg.openrouter.fallback_model}")
-    or_node.add(f"[#00ffff]Max Tokens:[/#00ffff] {cfg.openrouter.max_tokens}")
-    or_node.add(f"[#00ffff]Temperature:[/#00ffff] {cfg.openrouter.temperature}")
+    or_node = tree.add("[bold #ffff00]OpenRouter LLM Neural Hub[/]")
+    or_node.add(f"[#00ffff]Base URL:[/] {cfg.openrouter.base_url}")
+    or_node.add(f"[#00ffff]Default Free Model:[/] {cfg.openrouter.default_model}")
+    or_node.add(f"[#00ffff]Fallback Model:[/] {cfg.openrouter.fallback_model}")
+    or_node.add(f"[#00ffff]Max Tokens:[/] {cfg.openrouter.max_tokens}")
+    or_node.add(f"[#00ffff]Temperature:[/] {cfg.openrouter.temperature}")
     masked_key = "sk-or-v1-***" + cfg.openrouter.api_key.get_secret_value()[-6:] if cfg.openrouter.api_key else "Not Set"
-    or_node.add(f"[#00ffff]API Key:[/#00ffff] [dim]{masked_key}[/dim]")
+    or_node.add(f"[#00ffff]API Key:[/] [dim]{masked_key}[/]")
 
     # Executor Node
-    exec_node = tree.add("[bold #ffff00]Safe Subprocess Sandbox[/bold #ffff00]")
-    exec_node.add(f"[#00ffff]Default Timeout:[/#00ffff] {cfg.executor.default_timeout_seconds}s")
-    exec_node.add(f"[#00ffff]Max Timeout:[/#00ffff] {cfg.executor.max_timeout_seconds}s")
-    exec_node.add(f"[#00ffff]Safelisted Env Vars:[/#00ffff] {', '.join(cfg.executor.safe_environment_vars)}")
+    exec_node = tree.add("[bold #ffff00]Safe Subprocess Sandbox[/]")
+    exec_node.add(f"[#00ffff]Default Timeout:[/] {cfg.executor.default_timeout_seconds}s")
+    exec_node.add(f"[#00ffff]Max Timeout:[/] {cfg.executor.max_timeout_seconds}s")
+    exec_node.add(f"[#00ffff]Safelisted Env Vars:[/] {', '.join(cfg.executor.safe_environment_vars)}")
 
     # Timeouts Node
-    timeout_node = tree.add("[bold #ffff00]Assessment Profile Timeouts[/bold #ffff00]")
+    timeout_node = tree.add("[bold #ffff00]Assessment Profile Timeouts[/]")
     for tool in ["nmap", "whatweb", "nikto", "gobuster", "nuclei"]:
         t_fast = cfg.timeouts.get_timeout(tool, "fast")
         t_std = cfg.timeouts.get_timeout(tool, "standard")
         t_deep = cfg.timeouts.get_timeout(tool, "deep")
-        timeout_node.add(f"[#00ffff]{tool}:[/#00ffff] Fast={t_fast:.0f}s | Standard={t_std:.0f}s | Deep={t_deep:.0f}s")
+        timeout_node.add(f"[#00ffff]{tool}:[/] Fast={t_fast:.0f}s | Standard={t_std:.0f}s | Deep={t_deep:.0f}s")
 
     # Logging Node
-    log_node = tree.add("[bold #ffff00]Telemetry & Logging[/bold #ffff00]")
-    log_node.add(f"[#00ffff]Level:[/#00ffff] {cfg.logging.level}")
-    log_node.add(f"[#00ffff]JSON Output:[/#00ffff] {cfg.logging.json_format}")
-    log_node.add(f"[#00ffff]Log File:[/#00ffff] {cfg.logging.log_file or 'None'}")
+    log_node = tree.add("[bold #ffff00]Telemetry & Logging[/]")
+    log_node.add(f"[#00ffff]Level:[/] {cfg.logging.level}")
+    log_node.add(f"[#00ffff]JSON Output:[/] {cfg.logging.json_format}")
+    log_node.add(f"[#00ffff]Log File:[/] {cfg.logging.log_file or 'None'}")
 
     console.print(tree)
     console.print()
@@ -166,10 +166,10 @@ def list_plugins(ctx: typer.Context):
     registry = get_registry()
     all_plugins = registry.list_plugins()
 
-    console.print("[bold #00ffff]┌──[ DYNAMIC SECURITY TOOL MATRIX ]──┐[/bold #00ffff]\n")
+    console.print("[bold #00ffff]┌──[ DYNAMIC SECURITY TOOL MATRIX ]──┐[/]\n")
 
     if not all_plugins:
-        console.print("[#ffff00]No dynamic plugins discovered in plugins directory.[/#ffff00]\n")
+        console.print("[#ffff00]No dynamic plugins discovered in plugins directory.[/]\n")
         return
 
     table = Table(
@@ -184,8 +184,8 @@ def list_plugins(ctx: typer.Context):
 
     for name, plugin in sorted(all_plugins.items()):
         is_inst = plugin.is_installed()
-        binary_status = "[bold #00ff66][INSTALLED][/bold #00ff66]" if is_inst else "[bold #ffff00][MISSING][/bold #ffff00]"
-        op_state = "[bold #00ff66][READY][/bold #00ff66]" if is_inst else "[bold #ff0055][DISABLED][/bold #ff0055]"
+        binary_status = "[bold #00ff66][INSTALLED][/]" if is_inst else "[bold #ffff00][MISSING][/]"
+        op_state = "[bold #00ff66][READY][/]" if is_inst else "[bold #ff0055][DISABLED][/]"
 
         table.add_row(plugin.name, binary_status, op_state, plugin.description)
 
@@ -204,29 +204,29 @@ def scan_command(
     from core.planner import AIPlanner
     from core.workflow import WorkflowEngine
 
-    console.print(f"\n[bold #00ffff]┌──[ 🚀 INITIATING AUTOMATED CYBER SCANNER ]──┐[/bold #00ffff]")
-    console.print(f"[bold #00ffff]Target:[/#00ffff] [bold #ffff00]{target}[/bold #ffff00] | [bold #00ffff]Profile:[/#00ffff] [bold #ff007f]{profile.upper()}[/bold #ff007f]\n")
+    console.print(f"\n[bold #00ffff]┌──[ 🚀 INITIATING AUTOMATED CYBER SCANNER ]──┐[/]")
+    console.print(f"[bold #00ffff]Target:[/] [bold #ffff00]{target}[/] | [bold #00ffff]Profile:[/] [bold #ff007f]{profile.upper()}[/]\n")
 
     cfg: AppConfig = ctx.obj["config"]
     planner = AIPlanner()
     engine = WorkflowEngine()
 
     if not engine.validate_target(target):
-        console.print(f"[bold #ff0055]CRITICAL ERROR:[/#ff0055] Target string '{target}' is invalid format.")
+        console.print(f"[bold #ff0055]CRITICAL ERROR:[/] Target string '{target}' is invalid format.")
         raise typer.Exit(code=1)
 
     if not auto_approve:
         confirm = typer.confirm("⚠️ AUTHORIZATION CHECK: Do you have explicit written permission to scan this target?")
         if not confirm:
-            console.print("[bold #ff0055]SCAN ABORTED: Target authorization rejected.[/bold #ff0055]\n")
+            console.print("[bold #ff0055]SCAN ABORTED: Target authorization rejected.[/]\n")
             raise typer.Exit(code=1)
 
-    with console.status(f"[bold #00ff66]⚡ Formulating AI Execution Plan (Profile: {profile.upper()})...[/bold #00ff66]"):
+    with console.status(f"[bold #00ff66]⚡ Formulating AI Execution Plan (Profile: {profile.upper()})...[/]"):
         plan = planner.generate_plan(target)
 
     # Display steps table with resolved timeout per plugin
     table = Table(
-        title=f"[bold #00ff66]EXECUTION SEQUENCE MATRIX ({profile.upper()} PROFILE)[/bold #00ff66]",
+        title=f"[bold #00ff66]EXECUTION SEQUENCE MATRIX ({profile.upper()} PROFILE)[/]",
         box=box.DOUBLE_EDGE,
         header_style="bold #ff007f",
         border_style="#00ffff"
@@ -258,18 +258,18 @@ def scan_command(
         step_options["timeout"] = timeout_val
         step_options["profile"] = profile
 
-        with console.status(f"[bold #00ff66]⚡ RUNNING TOOL STEP {step.step_number}/{len(plan.execution_order)}: {tool_name} (Timeout: {timeout_val:.0f}s | Profile: {profile.upper()})...[/bold #00ff66]"):
+        with console.status(f"[bold #00ff66]⚡ RUNNING TOOL STEP {step.step_number}/{len(plan.execution_order)}: {tool_name} (Timeout: {timeout_val:.0f}s | Profile: {profile.upper()})...[/]"):
             output = plugin.execute(target, step_options)
             step_outputs.append(output)
             duration = output.metadata.get("execution_time_ms", 0.0)
             total_time_ms += duration
 
             if output.status == "TIMED_OUT":
-                console.print(f"  [bold #ffff00]⏱️ {tool_name} TIMED OUT after {timeout_val:.0f}s (Partial findings preserved).[/bold #ffff00]")
+                console.print(f"  [bold #ffff00]⏱️ {tool_name} TIMED OUT after {timeout_val:.0f}s (Partial findings preserved).[/]")
             elif output.status == "COMPLETED":
-                console.print(f"  [bold #00ff66]✓ {tool_name} COMPLETED in {duration/1000.0:.2f}s ({len(output.findings)} findings).[/bold #00ff66]")
+                console.print(f"  [bold #00ff66]✓ {tool_name} COMPLETED in {duration/1000.0:.2f}s ({len(output.findings)} findings).[/]")
             else:
-                console.print(f"  [bold #ff0055]✗ {tool_name} STATUS: {output.status}[/bold #ff0055]")
+                console.print(f"  [bold #ff0055]✗ {tool_name} STATUS: {output.status}[/]")
 
     # Persist scan results
     from memory.database import get_db_engine
@@ -299,14 +299,14 @@ def scan_command(
         json.dump(raw_results, f, indent=2)
 
     console.print(Panel(
-        f"[bold #00ff66]SCAN WORKFLOW COMPLETE[/bold #00ff66]\n"
-        f"Target: [bold #ffff00]{target}[/bold #ffff00]\n"
-        f"Profile: [bold #ff007f]{profile.upper()}[/bold #ff007f]\n"
+        f"[bold #00ff66]SCAN WORKFLOW COMPLETE[/]\n"
+        f"Target: [bold #ffff00]{target}[/]\n"
+        f"Profile: [bold #ff007f]{profile.upper()}[/]\n"
         f"Steps Executed: {len(step_outputs)}\n"
         f"Total Duration: {total_time_ms / 1000.0:.2f} s\n"
-        f"Findings Discovered: [bold #00ff66]{total_findings}[/bold #00ff66]\n"
+        f"Findings Discovered: [bold #00ff66]{total_findings}[/]\n"
         f"[dim]Record persisted to SQLite DB & saved to '{json_filename}'.[/dim]",
-        title="[bold #00ffff]✅ EXECUTION SUMMARY[/bold #00ffff]",
+        title="[bold #00ffff]✅ EXECUTION SUMMARY[/]",
         border_style="#00ff66",
         box=box.DOUBLE,
         expand=False
@@ -319,8 +319,8 @@ def orchestrate_placeholder(
     playbook: str = typer.Argument(..., help="Path to assessment playbook YAML definition.")
 ):
     """[Placeholder] Execute multi-step AI security orchestration playbooks."""
-    console.print(f"[bold #ffff00]🚧 Command 'orchestrate' is a placeholder for Future Phases.[/bold #ffff00]")
-    console.print(f"Playbook specified: [cyan]{playbook}[/cyan]")
+    console.print(f"[bold #ffff00]🚧 Command 'orchestrate' is a placeholder for Future Phases.[/]")
+    console.print(f"Playbook specified: [cyan]{playbook}[/]")
 
 
 @app.command("analyze")
@@ -328,8 +328,8 @@ def analyze_placeholder(
     file_path: str = typer.Argument(..., help="Path to security scan log or artifact for AI analysis.")
 ):
     """[Placeholder] Perform AI-assisted vulnerability and triage analysis."""
-    console.print(f"[bold #ffff00]🚧 Command 'analyze' is a placeholder for Future Phases.[/bold #ffff00]")
-    console.print(f"Artifact specified: [cyan]{file_path}[/cyan]")
+    console.print(f"[bold #ffff00]🚧 Command 'analyze' is a placeholder for Future Phases.[/]")
+    console.print(f"Artifact specified: [cyan]{file_path}[/]")
 
 
 @app.command("plan")
@@ -343,37 +343,37 @@ def plan_assessment(
     from core.planner import AIPlanner
     from core.workflow import WorkflowEngine
 
-    console.print(f"\n[bold #00ffff]┌──[ 🧠 FORMULATING AI STRATEGIC PLAN ]──┐[/bold #00ffff]")
-    console.print(f"[bold #00ffff]Target:[/#00ffff] [bold #ffff00]{target}[/bold #ffff00] | [bold #00ffff]Profile:[/#00ffff] [bold #ff007f]{profile.upper()}[/bold #ff007f]\n")
+    console.print(f"\n[bold #00ffff]┌──[ 🧠 FORMULATING AI STRATEGIC PLAN ]──┐[/]")
+    console.print(f"[bold #00ffff]Target:[/] [bold #ffff00]{target}[/] | [bold #00ffff]Profile:[/] [bold #ff007f]{profile.upper()}[/]\n")
 
     cfg: AppConfig = ctx.obj["config"]
     planner = AIPlanner()
     engine = WorkflowEngine()
 
     if not engine.validate_target(target):
-        console.print(f"[bold #ff0055]CRITICAL ERROR:[/#ff0055] Target string '{target}' is invalid format.")
+        console.print(f"[bold #ff0055]CRITICAL ERROR:[/] Target string '{target}' is invalid format.")
         raise typer.Exit(code=1)
 
-    with console.status(f"[bold #00ff66]⚡ Querying OpenRouter Neural AI Engine...[/bold #00ff66]"):
+    with console.status(f"[bold #00ff66]⚡ Querying OpenRouter Neural AI Engine...[/]"):
         plan = planner.generate_plan(target)
 
     # Display Scope Summary & Target
     console.print(Panel(
-        f"[#00ffff]Target:[/#00ffff] {plan.target}\n[#00ffff]Scope Assessment:[/#00ffff] {plan.scope_summary}",
-        title="[bold #00ffff]🎯 TARGET SCOPE & FOOTPRINT[/bold #00ffff]",
+        f"[#00ffff]Target:[/] {plan.target}\n[#00ffff]Scope Assessment:[/] {plan.scope_summary}",
+        title="[bold #00ffff]🎯 TARGET SCOPE & FOOTPRINT[/]",
         border_style="#00ffff",
         box=box.ROUNDED,
         expand=False
     ))
 
     # Display Selected Plugins
-    plugins_str = ", ".join(f"[bold #00ff66]{p}[/bold #00ff66]" for p in plan.selected_plugins)
-    console.print(f"\n[bold #ff007f]Selected Tool Modules:[bold #ff007f] {plugins_str}")
-    console.print(f"[bold #ff007f]Assessment Profile:[bold #ff007f] [yellow]{profile.upper()}[/yellow]")
+    plugins_str = ", ".join(f"[bold #00ff66]{p}[/]" for p in plan.selected_plugins)
+    console.print(f"\n[bold #ff007f]Selected Tool Modules:[/] {plugins_str}")
+    console.print(f"[bold #ff007f]Assessment Profile:[/] [yellow]{profile.upper()}[/]")
 
     # Display Execution Steps Table with Timeout
     table = Table(
-        title=f"[bold #00ff66]PLANNED EXECUTION MATRIX ({profile.upper()} PROFILE)[/bold #00ff66]",
+        title=f"[bold #00ff66]PLANNED EXECUTION MATRIX ({profile.upper()} PROFILE)[/]",
         box=box.DOUBLE_EDGE,
         header_style="bold #ff007f",
         border_style="#00ffff"
@@ -392,7 +392,7 @@ def plan_assessment(
     # Display Strategic AI Reasoning
     console.print(Panel(
         plan.reasoning,
-        title="[bold #ffff00]💡 STRATEGIC NEURAL REASONING[/bold #ffff00]",
+        title="[bold #ffff00]💡 STRATEGIC NEURAL REASONING[/]",
         border_style="#ffff00",
         box=box.ROUNDED,
         expand=False
@@ -402,7 +402,7 @@ def plan_assessment(
     if execute_now:
         confirm = typer.confirm("⚠️ AUTHORIZATION CHECK: Do you have explicit written permission to scan this target?")
         if not confirm:
-            console.print("[bold #ff0055]SCAN ABORTED: Target authorization rejected.[/bold #ff0055]\n")
+            console.print("[bold #ff0055]SCAN ABORTED: Target authorization rejected.[/]\n")
             raise typer.Exit(code=1)
 
         step_outputs = []
@@ -420,16 +420,16 @@ def plan_assessment(
             step_options["timeout"] = timeout_val
             step_options["profile"] = profile
 
-            with console.status(f"[bold #00ff66]⚡ RUNNING TOOL STEP {step.step_number}/{len(plan.execution_order)}: {tool_name} (Timeout: {timeout_val:.0f}s | Profile: {profile.upper()})...[/bold #00ff66]"):
+            with console.status(f"[bold #00ff66]⚡ RUNNING TOOL STEP {step.step_number}/{len(plan.execution_order)}: {tool_name} (Timeout: {timeout_val:.0f}s | Profile: {profile.upper()})...[/]"):
                 output = plugin.execute(target, step_options)
                 step_outputs.append(output)
                 duration = output.metadata.get("execution_time_ms", 0.0)
                 total_time_ms += duration
 
                 if output.status == "TIMED_OUT":
-                    console.print(f"  [bold #ffff00]⏱️ {tool_name} TIMED OUT after {timeout_val:.0f}s (Partial findings preserved).[/bold #ffff00]")
+                    console.print(f"  [bold #ffff00]⏱️ {tool_name} TIMED OUT after {timeout_val:.0f}s (Partial findings preserved).[/]")
                 elif output.status == "COMPLETED":
-                    console.print(f"  [bold #00ff66]✓ {tool_name} COMPLETED in {duration/1000.0:.2f}s ({len(output.findings)} findings).[/bold #00ff66]")
+                    console.print(f"  [bold #00ff66]✓ {tool_name} COMPLETED in {duration/1000.0:.2f}s ({len(output.findings)} findings).[/]")
 
         # Save Scan Record to SQLite Persistence & Write JSON File
         from memory.database import get_db_engine
@@ -454,14 +454,14 @@ def plan_assessment(
             json.dump(raw_results, f, indent=2)
 
         console.print(Panel(
-            f"[bold #00ff66]WORKFLOW EXECUTION COMPLETE[/bold #00ff66]\n"
-            f"Target: [bold #ffff00]{plan.target}[/bold #ffff00]\n"
-            f"Profile: [bold #ff007f]{profile.upper()}[/bold #ff007f]\n"
+            f"[bold #00ff66]WORKFLOW EXECUTION COMPLETE[/]\n"
+            f"Target: [bold #ffff00]{plan.target}[/]\n"
+            f"Profile: [bold #ff007f]{profile.upper()}[/]\n"
             f"Steps Executed: {len(step_outputs)}\n"
             f"Total Duration: {total_time_ms / 1000.0:.2f} s\n"
-            f"Findings Discovered: [bold #00ff66]{total_findings}[/bold #00ff66]\n"
+            f"Findings Discovered: [bold #00ff66]{total_findings}[/]\n"
             f"[dim]Persisted to SQLite DB & saved to '{json_filename}'.[/dim]",
-            title="[bold #00ffff]✅ EXECUTION SUMMARY[/bold #00ffff]",
+            title="[bold #00ffff]✅ EXECUTION SUMMARY[/]",
             border_style="#00ff66",
             box=box.DOUBLE,
             expand=False
@@ -482,10 +482,10 @@ def show_history(
 
     scans = db.get_recent_scans(limit=limit)
 
-    console.print("[bold #00ffff]┌──[ PERSISTENT SCAN AUDIT LOG ]──┐[/bold #00ffff]\n")
+    console.print("[bold #00ffff]┌──[ PERSISTENT SCAN AUDIT LOG ]──┐[/]\n")
 
     if not scans:
-        console.print("[#ffff00]No historical scan records found in database.[/#ffff00]")
+        console.print("[#ffff00]No historical scan records found in database.[/]")
         console.print(f"[dim]Database URL: {cfg.database.db_url}[/dim]\n")
         return
 
@@ -502,7 +502,7 @@ def show_history(
     table.add_column("Duration", width=12)
 
     for scan in scans:
-        status_style = "[bold #00ff66]COMPLETED[/bold #00ff66]" if scan.status == "COMPLETED" else f"[bold #ff0055]{scan.status}[/bold #ff0055]"
+        status_style = "[bold #00ff66]COMPLETED[/]" if scan.status == "COMPLETED" else f"[bold #ff0055]{scan.status}[/]"
         date_str = scan.date.strftime("%Y-%m-%d %H:%M:%S") if scan.date else "N/A"
         plugins_str = ", ".join(scan.plugins_used) if scan.plugins_used else "None"
         dur_str = f"{scan.execution_time_ms / 1000.0:.1f}s"
@@ -539,22 +539,22 @@ def generate_reports(
 
     p = Path(file_path)
     if not p.is_file():
-        console.print(f"[bold #ff0055]CRITICAL ERROR:[/#ff0055] Scan result JSON file '{file_path}' does not exist.")
+        console.print(f"[bold #ff0055]CRITICAL ERROR:[/] Scan result JSON file '{file_path}' does not exist.")
         raise typer.Exit(code=1)
 
     try:
         with open(p, "r", encoding="utf-8") as f:
             raw_data = json.load(f)
     except Exception as e:
-        console.print(f"[bold #ff0055]CRITICAL ERROR:[/#ff0055] Failed to parse JSON file '{file_path}': {str(e)}")
+        console.print(f"[bold #ff0055]CRITICAL ERROR:[/] Failed to parse JSON file '{file_path}': {str(e)}")
         raise typer.Exit(code=1)
 
     analyzer = AIResultsAnalyzer()
-    with console.status("[bold #00ff66]⚡ Analyzing scan findings & segregating facts vs AI inferences...[/bold #00ff66]"):
+    with console.status("[bold #00ff66]⚡ Analyzing scan findings & segregating facts vs AI inferences...[/]"):
         analysis = analyzer.analyze_json(raw_data)
 
-    console.print(f"\n[bold #00ffff]┌──[ AI ANALYSIS COMPLETE ]──┐[/bold #00ffff]")
-    console.print(f"Target: [bold #ffff00]{analysis.target}[/bold #ffff00] | Confidence: [bold #00ff66]{analysis.confidence * 100:.1f}%[/bold #00ff66]\n")
+    console.print(f"\n[bold #00ffff]┌──[ AI ANALYSIS COMPLETE ]──┐[/]")
+    console.print(f"Target: [bold #ffff00]{analysis.target}[/] | Confidence: [bold #00ff66]{analysis.confidence * 100:.1f}%[/]\n")
 
     output_directory = Path(out_dir)
     output_directory.mkdir(parents=True, exist_ok=True)
@@ -582,7 +582,7 @@ def generate_reports(
 
     console.print(Panel(
         "\n".join(f"• {f}" for f in generated_files),
-        title="[bold #00ffff]📄 SECURITY REPORTS GENERATED[/bold #00ffff]",
+        title="[bold #00ffff]📄 SECURITY REPORTS GENERATED[/]",
         border_style="#00ff66",
         box=box.DOUBLE,
         expand=False
