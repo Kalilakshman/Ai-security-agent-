@@ -2,7 +2,6 @@
 Plugin package initialization.
 """
 
-from plugins.base import SecurityPlugin
-from plugins.manager import PluginManager
+from plugins.base import BasePlugin, StandardPluginOutput
 
-__all__ = ["SecurityPlugin", "PluginManager"]
+__all__ = ["BasePlugin", "StandardPluginOutput"]
