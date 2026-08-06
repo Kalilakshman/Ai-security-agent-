@@ -58,7 +58,31 @@ Production-grade, modular, DevSecOps-ready AI Security Orchestrator CLI built wi
 
 ## 📦 Installation Guide
 
-### Option 1: Native Installation (Python 3.12)
+### Option 1: Kali Linux / Ubuntu / Debian Installation
+```bash
+# 1. Update system package index & install required scanner binaries
+sudo apt update
+sudo apt install -y python3 python3-pip python3-venv git nmap whatweb nikto gobuster nuclei
+
+# 2. Clone repository & navigate to directory
+git clone https://github.com/Kalilakshman/Ai-security-agent-.git
+cd Ai-security-agent-
+
+# 3. Create & activate Python virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# 4. Install package in editable mode
+pip install -e .[dev]
+
+# 5. Export OpenRouter API key
+export OPENROUTER_API_KEY="your-openrouter-api-key-here"
+
+# 6. Verify installation
+security-ai doctor
+```
+
+### Option 2: Windows / Generic Native Installation (Python 3.12)
 ```bash
 # Clone or navigate to codebase
 cd security-orchestrator
@@ -66,18 +90,14 @@ cd security-orchestrator
 # Create virtual environment
 python -m venv .venv
 
-# Activate virtual environment
-# Windows PowerShell:
+# Activate virtual environment (Windows PowerShell)
 .venv\Scripts\Activate.ps1
-
-# Linux / macOS:
-source .venv/bin/activate
 
 # Install in editable mode
 pip install -e .[dev]
 ```
 
-### Option 2: Docker Container Setup
+### Option 3: Docker Container Setup
 ```bash
 # Build multi-stage Docker image
 make docker-build
