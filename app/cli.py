@@ -26,7 +26,6 @@ from core.config import load_config, AppConfig
 from core.logger import setup_logger, get_logger, get_console
 from core.executor import SafeExecutor
 from core.llm_openrouter import OpenRouterLLMProvider
-from plugins.manager import PluginManager
 
 app = typer.Typer(
     name="security-ai",

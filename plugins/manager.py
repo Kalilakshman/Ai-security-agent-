@@ -6,7 +6,7 @@ import os
 import sys
 import importlib
 from pathlib import Path
-from typing import Dict, List, Type
+from typing import Dict, List, Type, Optional
 from core.interfaces import IPlugin, PluginStatus
 from core.logger import get_logger
 
