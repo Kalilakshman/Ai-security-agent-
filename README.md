@@ -129,41 +129,66 @@ openrouter:
 
 ## 💻 CLI Commands & Usage Examples
 
-### 1. Environment & API Diagnostics (`doctor`)
+### 1. Automated Security Assessment Scan (`scan`)
+Run an automated security scan against an authorized target with a specific assessment profile (`fast`, `standard`, or `deep`):
+```bash
+# Standard profile (Default timeouts)
+security-ai scan scanme.nmap.org
+
+# Deep profile (Long-running assessment with extended timeouts up to 2 hours)
+security-ai scan scanme.nmap.org --profile deep
+
+# Fast profile (Quick discovery with short timeouts)
+security-ai scan scanme.nmap.org --profile fast --yes
+```
+
+### 2. AI-Driven Assessment Planning (`plan`)
+Formulate an AI-driven security assessment plan:
+```bash
+# View AI assessment plan
+security-ai plan scanme.nmap.org --profile deep
+
+# Generate plan and prompt for authorization to execute immediately
+security-ai plan scanme.nmap.org --profile deep --execute
+```
+
+### 3. Environment & API Diagnostics (`doctor`)
 ```bash
 security-ai doctor
 ```
 
-### 2. View System Tool & Plugin Status (`plugins`)
+### 4. View System Tool & Plugin Status (`plugins`)
 ```bash
 security-ai plugins
 ```
 
-### 3. Display Configuration (`config`)
+### 5. Display Configuration & Timeouts (`config`)
 ```bash
 security-ai config
 ```
 
-### 4. AI-Driven Assessment Planning (`plan`)
-Formulate an AI assessment plan for a target:
-```bash
-security-ai plan scanme.nmap.org
-```
-To prompt for authorization and execute workflow immediately:
-```bash
-security-ai plan scanme.nmap.org --execute
-```
-
-### 5. Generate Multi-Format Reports (`report`)
+### 6. Generate Multi-Format Reports (`report`)
 Analyze normalized scan JSON results and generate Markdown, HTML, and PDF reports:
 ```bash
-security-ai report scan_results.json --md --html --pdf -o my_reports/
+security-ai report scan_scanme.nmap.org.json --md --html --pdf -o my_reports/
 ```
 
-### 6. View Historical Assessments (`history`)
+### 7. View Historical Assessments (`history`)
 ```bash
 security-ai history --limit 10
 ```
+
+---
+
+## ⏱️ Assessment Profiles & Timeout Controls
+
+| Tool Plugin | Fast Profile (`-p fast`) | Standard Profile (`-p standard`) | Deep Profile (`-p deep`) |
+| :--- | :--- | :--- | :--- |
+| **`nmap`** | 120s (2m) | 600s (10m) | 1800s (30m) |
+| **`whatweb`** | 60s (1m) | 300s (5m) | 900s (15m) |
+| **`nikto`** | 180s (3m) | 900s (15m) | 2400s (40m) |
+| **`gobuster`** | 180s (3m) | 1200s (20m) | 3600s (60m) |
+| **`nuclei`** | 300s (5m) | 1800s (30m) | 7200s (120m) |
 
 ---
 
