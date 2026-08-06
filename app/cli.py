@@ -170,13 +170,117 @@ def list_plugins(ctx: typer.Context):
 
 # Placeholder Commands for Future Phases
 @app.command("scan")
-def scan_placeholder(
-    target: str = typer.Argument(..., help="Target host, network block, or repository URI.")
+def scan_command(
+    ctx: typer.Context,
+    target: str = typer.Argument(..., help="Target IP address, hostname, domain, or URL."),
+    profile: str = typer.Option("standard", "--profile", "-p", help="Assessment profile: fast, standard, or deep."),
+    auto_approve: bool = typer.Option(False, "--yes", "-y", help="Automatically confirm target authorization.")
 ):
-    """[Placeholder] Run automated security scanning workflows against authorized targets."""
-    console.print(f"[bold yellow]🚧 Command 'scan' is a placeholder for Future Phases.[/bold yellow]")
-    console.print(f"Target specified: [cyan]{target}[/cyan]")
-    console.print("[dim]Phase 1 foundation build complete. Automated scanning module scheduled for next phase.[/dim]")
+    """Run automated security scanning workflow against an authorized target."""
+    from core.planner import AIPlanner
+    from core.workflow import WorkflowEngine
+
+    console.print(f"\n[bold cyan]🚀 Initiating Security Assessment Scan for:[/bold cyan] [yellow]{target}[/yellow] [dim](Profile: {profile.upper()})[/dim]\n")
+
+    cfg: AppConfig = ctx.obj["config"]
+    planner = AIPlanner()
+    engine = WorkflowEngine()
+
+    if not engine.validate_target(target):
+        console.print(f"[bold red]ERROR:[/bold red] Target string '{target}' is invalid format.")
+        raise typer.Exit(code=1)
+
+    if not auto_approve:
+        confirm = typer.confirm("⚠️ Do you have explicit written authorization to scan this target system?")
+        if not confirm:
+            console.print("[bold red]Scan cancelled: Target authorization rejected.[/bold red]\n")
+            raise typer.Exit(code=1)
+
+    with console.status(f"[bold green]Formulating plan and resolving timeouts for profile '{profile}'...[/bold green]"):
+        plan = planner.generate_plan(target)
+
+    # Display steps table with resolved timeout per plugin
+    table = Table(title=f"📋 Execution Steps (Profile: {profile.upper()})", show_header=True, header_style="bold magenta")
+    table.add_column("Step", style="cyan", width=6)
+    table.add_column("Tool", style="green", width=15)
+    table.add_column("Timeout", style="yellow", width=12)
+    table.add_column("Objective & Purpose")
+
+    for step in plan.execution_order:
+        timeout_val = cfg.timeouts.get_timeout(step.tool, profile=profile)
+        table.add_row(str(step.step_number), step.tool, f"{timeout_val:.0f}s", step.purpose)
+
+    console.print(table)
+    console.print()
+
+    step_outputs = []
+    total_time_ms = 0.0
+
+    for step in plan.execution_order:
+        tool_name = step.tool
+        timeout_val = cfg.timeouts.get_timeout(tool_name, profile=profile)
+        plugin = engine.registry.get_plugin(tool_name)
+
+        if not plugin:
+            continue
+
+        step_options = dict(step.options or {})
+        step_options["timeout"] = timeout_val
+        step_options["profile"] = profile
+
+        # Display current timeout for each plugin in terminal UI while running
+        with console.status(f"[bold green]Running step {step.step_number}/{len(plan.execution_order)}: {tool_name} (Timeout: {timeout_val:.0f}s | Profile: {profile.upper()})...[/bold green]"):
+            output = plugin.execute(target, step_options)
+            step_outputs.append(output)
+            duration = output.metadata.get("execution_time_ms", 0.0)
+            total_time_ms += duration
+
+            if output.status == "TIMED_OUT":
+                console.print(f"  [bold yellow]⏱️ {tool_name} timed out after {timeout_val:.0f}s (Partial findings preserved).[/bold yellow]")
+            elif output.status == "COMPLETED":
+                console.print(f"  [bold green]✓ {tool_name} completed in {duration/1000.0:.2f}s ({len(output.findings)} findings).[/bold green]")
+            else:
+                console.print(f"  [bold red]✗ {tool_name} status: {output.status}[/bold red]")
+
+    # Persist scan results
+    from memory.database import get_db_engine
+    import json
+
+    db = get_db_engine(cfg.database.db_url)
+    total_findings = sum(len(out.findings) for out in step_outputs)
+
+    raw_results = {
+        "target": target,
+        "profile": profile,
+        "step_results": [s.model_dump() for s in step_outputs]
+    }
+
+    db.save_scan(
+        target=target,
+        plugins_used=plan.selected_plugins,
+        execution_time_ms=total_time_ms,
+        status="COMPLETED",
+        raw_results=raw_results,
+        summary={"steps_executed": len(step_outputs), "total_findings": total_findings, "profile": profile}
+    )
+
+    clean_target = target.replace("://", "_").replace("/", "_").replace(":", "_")
+    json_filename = f"scan_{clean_target}.json"
+    with open(json_filename, "w", encoding="utf-8") as f:
+        json.dump(raw_results, f, indent=2)
+
+    console.print(Panel(
+        f"[green]Workflow Execution Completed Successfully![/green]\n"
+        f"Target: {target}\n"
+        f"Profile: {profile.upper()}\n"
+        f"Steps Executed: {len(step_outputs)}\n"
+        f"Total Wall-Clock Time: {total_time_ms / 1000.0:.2f} s\n"
+        f"Total Findings Discovered: {total_findings}\n"
+        f"[dim]Scan record persisted to SQLite database and written to '{json_filename}'.[/dim]",
+        title="✅ Assessment Complete",
+        expand=False
+    ))
+    console.print()
 
 
 @app.command("orchestrate")
@@ -203,13 +307,14 @@ def analyze_placeholder(
 def plan_assessment(
     ctx: typer.Context,
     target: str = typer.Argument(..., help="Target IP address, hostname, domain, or URL."),
+    profile: str = typer.Option("standard", "--profile", "-p", help="Assessment profile: fast, standard, or deep."),
     execute_now: bool = typer.Option(False, "--execute", "-e", help="Prompt for authorization and execute planned workflow immediately.")
 ):
     """Generate an AI-driven security assessment plan for a target using OpenRouter."""
     from core.planner import AIPlanner
     from core.workflow import WorkflowEngine
 
-    console.print(f"\n[bold cyan]🧠 Formulating AI Security Assessment Plan for:[/bold cyan] [yellow]{target}[/yellow]\n")
+    console.print(f"\n[bold cyan]🧠 Formulating AI Security Assessment Plan for:[/bold cyan] [yellow]{target}[/yellow] [dim](Profile: {profile.upper()})[/dim]\n")
 
     cfg: AppConfig = ctx.obj["config"]
     planner = AIPlanner()
@@ -219,7 +324,7 @@ def plan_assessment(
         console.print(f"[bold red]ERROR:[/bold red] Target string '{target}' is invalid format.")
         raise typer.Exit(code=1)
 
-    with console.status("[bold green]Querying OpenRouter LLM and building plan...[/bold green]"):
+    with console.status(f"[bold green]Querying OpenRouter LLM and resolving timeouts for profile '{profile}'...[/bold green]"):
         plan = planner.generate_plan(target)
 
     # Display Scope Summary & Target
@@ -228,16 +333,18 @@ def plan_assessment(
     # Display Selected Plugins
     plugins_str = ", ".join(f"[bold green]{p}[/bold green]" for p in plan.selected_plugins)
     console.print(f"\n[bold magenta]Selected Tool Plugins:[/bold magenta] {plugins_str}")
-    console.print(f"[bold magenta]Estimated Execution Time:[/bold magenta] [yellow]~{plan.estimated_duration_seconds:.1f} seconds[/yellow]\n")
+    console.print(f"[bold magenta]Assessment Profile:[/bold magenta] [yellow]{profile.upper()}[/yellow]")
 
-    # Display Execution Steps Table
-    table = Table(title="📋 Planned Execution Order", show_header=True, header_style="bold magenta")
+    # Display Execution Steps Table with Timeout
+    table = Table(title=f"📋 Planned Execution Order ({profile.upper()} Profile)", show_header=True, header_style="bold magenta")
     table.add_column("Step", style="cyan", width=6)
     table.add_column("Tool", style="green", width=15)
+    table.add_column("Timeout", style="yellow", width=12)
     table.add_column("Objective & Purpose")
 
     for step in plan.execution_order:
-        table.add_row(str(step.step_number), step.tool, step.purpose)
+        timeout_val = cfg.timeouts.get_timeout(step.tool, profile=profile)
+        table.add_row(str(step.step_number), step.tool, f"{timeout_val:.0f}s", step.purpose)
 
     console.print(table)
 
@@ -251,35 +358,61 @@ def plan_assessment(
             console.print("[bold red]Scan cancelled: Target authorization rejected.[/bold red]\n")
             raise typer.Exit(code=1)
 
-        with console.status("[bold green]Executing security workflow steps...[/bold green]"):
-            result = engine.execute_plan(plan, authorized=True)
+        step_outputs = []
+        total_time_ms = 0.0
+
+        for step in plan.execution_order:
+            tool_name = step.tool
+            timeout_val = cfg.timeouts.get_timeout(tool_name, profile=profile)
+            plugin = engine.registry.get_plugin(tool_name)
+
+            if not plugin:
+                continue
+
+            step_options = dict(step.options or {})
+            step_options["timeout"] = timeout_val
+            step_options["profile"] = profile
+
+            with console.status(f"[bold green]Running step {step.step_number}/{len(plan.execution_order)}: {tool_name} (Timeout: {timeout_val:.0f}s | Profile: {profile.upper()})...[/bold green]"):
+                output = plugin.execute(target, step_options)
+                step_outputs.append(output)
+                duration = output.metadata.get("execution_time_ms", 0.0)
+                total_time_ms += duration
+
+                if output.status == "TIMED_OUT":
+                    console.print(f"  [bold yellow]⏱️ {tool_name} timed out after {timeout_val:.0f}s (Partial findings preserved).[/bold yellow]")
+                elif output.status == "COMPLETED":
+                    console.print(f"  [bold green]✓ {tool_name} completed in {duration/1000.0:.2f}s ({len(output.findings)} findings).[/bold green]")
 
         # Save Scan Record to SQLite Persistence & Write JSON File
         from memory.database import get_db_engine
         import json
-        from pathlib import Path
 
         db = get_db_engine(cfg.database.db_url)
+        total_findings = sum(len(out.findings) for out in step_outputs)
+        raw_results = {"target": plan.target, "profile": profile, "step_results": [s.model_dump() for s in step_outputs]}
+
         db.save_scan(
-            target=result.target,
+            target=plan.target,
             plugins_used=plan.selected_plugins,
-            execution_time_ms=result.total_duration_ms,
+            execution_time_ms=total_time_ms,
             status="COMPLETED",
-            raw_results=result.model_dump(),
-            summary=result.summary
+            raw_results=raw_results,
+            summary={"steps_executed": len(step_outputs), "total_findings": total_findings, "profile": profile}
         )
 
-        clean_target = result.target.replace("://", "_").replace("/", "_").replace(":", "_")
+        clean_target = plan.target.replace("://", "_").replace("/", "_").replace(":", "_")
         json_filename = f"scan_{clean_target}.json"
         with open(json_filename, "w", encoding="utf-8") as f:
-            json.dump(result.model_dump(), f, indent=2)
+            json.dump(raw_results, f, indent=2)
 
         console.print(Panel(
             f"[green]Workflow Execution Completed Successfully![/green]\n"
-            f"Target: {result.target}\n"
-            f"Steps Executed: {result.summary['steps_executed']}\n"
-            f"Total Wall-Clock Time: {result.total_duration_ms:.2f} ms\n"
-            f"Total Findings Discovered: {result.summary['total_findings']}\n"
+            f"Target: {plan.target}\n"
+            f"Profile: {profile.upper()}\n"
+            f"Steps Executed: {len(step_outputs)}\n"
+            f"Total Wall-Clock Time: {total_time_ms / 1000.0:.2f} s\n"
+            f"Total Findings Discovered: {total_findings}\n"
             f"[dim]Scan record persisted to SQLite database and written to '{json_filename}'.[/dim]",
             title="✅ Scan Complete",
             expand=False

@@ -94,9 +94,20 @@ class BasePlugin(ABC):
             )
 
         command = self.build_command(target, options)
-        timeout = options.get("timeout", 120.0) if options else 120.0
+        
+        # Resolve timeout: check options["timeout"], options["profile"], or load from AppConfig
+        if options and "timeout" in options and options["timeout"] is not None:
+            timeout = float(options["timeout"])
+        else:
+            profile = options.get("profile", "standard") if options else "standard"
+            try:
+                from core.config import load_config
+                cfg = load_config()
+                timeout = cfg.timeouts.get_timeout(self.name, profile=profile)
+            except Exception:
+                timeout = 600.0
 
-        logger.info(f"Executing plugin '{self.name}' against target '{target}'")
+        logger.info(f"Executing plugin '{self.name}' against target '{target}' (timeout={timeout}s)")
         res: ExecutionResult = self.executor.execute(command, timeout_seconds=timeout)
 
         status = "COMPLETED"
@@ -105,6 +116,7 @@ class BasePlugin(ABC):
         if res.timed_out:
             status = "TIMED_OUT"
             errors.append(f"Execution timed out after {timeout} seconds.")
+            logger.warning(f"Plugin '{self.name}' timed out after {timeout} seconds. Terminating process and preserving partial results.")
         elif not res.is_success:
             status = "FAILED"
             if res.stderr:
@@ -112,6 +124,7 @@ class BasePlugin(ABC):
             else:
                 errors.append(f"Process exited with non-zero code {res.exit_code}.")
 
+        # Always parse and preserve partial output even if process timed out or failed
         findings = self.parse(res.stdout, res.stderr)
 
         return StandardPluginOutput(

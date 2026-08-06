@@ -62,7 +62,12 @@ class WorkflowEngine:
         logger.info(f"Authorization confirmed for target '{target}'.")
         return True
 
-    def execute_plan(self, plan: ExecutionPlan, authorized: bool) -> UnifiedScanResult:
+    def execute_plan(
+        self,
+        plan: ExecutionPlan,
+        authorized: bool,
+        profile: str = "standard"
+    ) -> UnifiedScanResult:
         """Execute planned steps sequentially, collect JSON results, and return unified scan output."""
         if not self.validate_target(plan.target):
             raise ValueError(f"Invalid target format: '{plan.target}'")
@@ -70,7 +75,7 @@ class WorkflowEngine:
         if not self.require_authorization_acknowledgement(plan.target, authorized):
             raise PermissionError(f"Execution aborted: Target '{plan.target}' not authorized.")
 
-        logger.info(f"Executing workflow plan for target '{plan.target}' ({len(plan.execution_order)} steps)...")
+        logger.info(f"Executing workflow plan for target '{plan.target}' ({len(plan.execution_order)} steps, profile='{profile}')...")
 
         step_outputs: List[StandardPluginOutput] = []
         total_time_ms = 0.0
@@ -89,8 +94,24 @@ class WorkflowEngine:
                 ))
                 continue
 
-            logger.info(f"Running step {step.step_number}/{len(plan.execution_order)}: {tool_name}")
-            output = plugin.execute(plan.target, step.options)
+            # Merge profile into step options if not explicitly specified
+            step_options = dict(step.options or {})
+            if "profile" not in step_options:
+                step_options["profile"] = profile
+
+            logger.info(f"Running step {step.step_number}/{len(plan.execution_order)}: {tool_name} (profile={profile})")
+            
+            try:
+                output = plugin.execute(plan.target, step_options)
+            except Exception as e:
+                logger.error(f"Error during execution of plugin '{tool_name}': {str(e)}")
+                output = StandardPluginOutput(
+                    tool=tool_name,
+                    target=plan.target,
+                    status="FAILED",
+                    errors=[f"Execution exception: {str(e)}"]
+                )
+
             step_outputs.append(output)
 
             duration = output.metadata.get("execution_time_ms", 0.0)

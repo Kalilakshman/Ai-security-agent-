@@ -44,6 +44,28 @@ plugins:
     - gobuster
     - nuclei
 
+timeouts:
+  nmap:
+    fast: 120
+    standard: 600
+    deep: 1800
+  whatweb:
+    fast: 60
+    standard: 300
+    deep: 900
+  nikto:
+    fast: 180
+    standard: 900
+    deep: 2400
+  gobuster:
+    fast: 180
+    standard: 1200
+    deep: 3600
+  nuclei:
+    fast: 300
+    standard: 1800
+    deep: 7200
+
 logging:
   level: "INFO"
   json_format: false

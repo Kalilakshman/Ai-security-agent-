@@ -109,6 +109,48 @@ class PluginSettingsConfig(BaseModel):
     )
 
 
+class PluginTimeoutProfile(BaseModel):
+    """Timeout configuration in seconds per assessment profile for a specific plugin."""
+    fast: float = Field(default=120.0, description="Fast profile timeout in seconds.")
+    standard: float = Field(default=600.0, description="Standard profile timeout in seconds.")
+    deep: float = Field(default=1800.0, description="Deep profile timeout in seconds.")
+
+
+class TimeoutsConfig(BaseModel):
+    """Container for plugin-specific profile timeout settings."""
+    nmap: PluginTimeoutProfile = Field(
+        default_factory=lambda: PluginTimeoutProfile(fast=120.0, standard=600.0, deep=1800.0)
+    )
+    whatweb: PluginTimeoutProfile = Field(
+        default_factory=lambda: PluginTimeoutProfile(fast=60.0, standard=300.0, deep=900.0)
+    )
+    nikto: PluginTimeoutProfile = Field(
+        default_factory=lambda: PluginTimeoutProfile(fast=180.0, standard=900.0, deep=2400.0)
+    )
+    gobuster: PluginTimeoutProfile = Field(
+        default_factory=lambda: PluginTimeoutProfile(fast=180.0, standard=1200.0, deep=3600.0)
+    )
+    nuclei: PluginTimeoutProfile = Field(
+        default_factory=lambda: PluginTimeoutProfile(fast=300.0, standard=1800.0, deep=7200.0)
+    )
+
+    def get_timeout(self, plugin_name: str, profile: str = "standard") -> float:
+        """Resolve execution timeout in seconds for a specific plugin and assessment profile."""
+        profile_key = (profile or "standard").lower().strip()
+        plugin_key = plugin_name.lower().strip()
+
+        plugin_config = getattr(self, plugin_key, None)
+        if not plugin_config or not isinstance(plugin_config, PluginTimeoutProfile):
+            # Generic fallback for unlisted tools
+            plugin_config = PluginTimeoutProfile(fast=120.0, standard=600.0, deep=1800.0)
+
+        if profile_key == "fast":
+            return plugin_config.fast
+        elif profile_key == "deep":
+            return plugin_config.deep
+        return plugin_config.standard
+
+
 class LoggingConfig(BaseModel):
     """Configuration schema for application logging."""
     level: str = Field(
@@ -139,6 +181,7 @@ class AppConfig(BaseSettings):
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     reports: ReportConfig = Field(default_factory=ReportConfig)
     plugins: PluginSettingsConfig = Field(default_factory=PluginSettingsConfig)
+    timeouts: TimeoutsConfig = Field(default_factory=TimeoutsConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
 
     @classmethod
