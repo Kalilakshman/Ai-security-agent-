@@ -131,10 +131,10 @@ Run an automated security scan against an authorized target. Unrelated tool fail
 security-ai scan scanme.nmap.org -y
 
 # Deep assessment scan with 4 parallel worker threads
-security-ai scan https://www.spkcazk.com/ --profile deep --concurrency 4 -y
+security-ai scan https://www.example.com/ --profile deep --concurrency 4 -y
 
 # Resume an interrupted scan from saved atomic checkpoint
-security-ai scan https://www.spkcazk.com/ --resume latest -y
+security-ai scan https://www.example.com/ --resume latest -y
 ```
 
 ---
@@ -143,7 +143,7 @@ security-ai scan https://www.spkcazk.com/ --resume latest -y
 Formulate a structured AI security plan showing tool selection reasons and step dependencies without running tool binaries.
 
 ```bash
-security-ai plan https://www.spkcazk.com/ --profile deep
+security-ai plan https://www.example.com/ --profile deep
 ```
 
 ---
