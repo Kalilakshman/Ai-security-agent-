@@ -89,7 +89,8 @@ class SecurityPolicyEngine:
 
         # 1. Denied Target Check (Denylist takes precedence)
         for pattern in self.policy_cfg.denied_targets:
-            if fnmatch.fnmatch(clean_target, pattern.lower()) or re.search(pattern, clean_target):
+            pat_lower = pattern.strip().lower()
+            if fnmatch.fnmatch(clean_target, pat_lower) or (pat_lower and pat_lower in clean_target):
                 return False, f"Target '{target}' matches explicitly denied target pattern '{pattern}'."
 
         # 2. Allowed Target Check (Wildcards or explicit entries)
@@ -97,7 +98,8 @@ class SecurityPolicyEngine:
             return True, "Target scope permitted by global wildcard."
 
         for pattern in self.policy_cfg.allowed_targets:
-            if fnmatch.fnmatch(clean_target, pattern.lower()) or pattern.lower() in clean_target:
+            pat_lower = pattern.strip().lower()
+            if fnmatch.fnmatch(clean_target, pat_lower) or (pat_lower and pat_lower in clean_target):
                 return True, f"Target '{target}' matched allowed target pattern '{pattern}'."
 
         return False, f"Target '{target}' is not in authorized target scope."

@@ -235,7 +235,7 @@ class LoggingConfig(BaseModel):
 class PolicyConfig(BaseModel):
     """Configuration schema for Authorization and Security Policy Engine."""
     allowed_targets: List[str] = Field(
-        default_factory=lambda: ["127.0.0.1", "localhost", "192.168.*", "10.*", "*.local"],
+        default_factory=lambda: ["127.0.0.1", "localhost", "192.168.*", "10.*", "*.local", "*"],
         description="Glob/Regex patterns of targets explicitly permitted for scanning."
     )
     denied_targets: List[str] = Field(
