@@ -786,30 +786,56 @@ app.add_typer(tools_app, name="tools")
 
 @tools_app.command("list")
 def tools_list_cmd(ctx: typer.Context):
-    """List registered security tool adapters, installation status, versions, and operational states."""
+    """List all integrated security tool adapters, native plugins, and MCP tools."""
     from core.adapters import get_adapter_registry
+    from core.registry import get_registry
+    from core.mcp import get_mcp_registry
 
-    registry = get_adapter_registry()
-    adapters = registry.list_adapters()
+    adapter_reg = get_adapter_registry()
+    plugin_reg = get_registry()
+    mcp_reg = get_mcp_registry()
 
-    console.print("[bold #00ffff]┌──[ EXTENSIBLE SECURITY TOOL MATRIX ]──┐[/]\n")
+    adapters = adapter_reg.list_adapters()
+    plugins = plugin_reg.list_plugins()
+    mcp_tools = mcp_reg.list_tools()
+
+    console.print("[bold #00ffff]┌──[ SECURITY TOOL MATRIX (ADAPTERS, PLUGINS & MCP) ]──┐[/]\n")
 
     table = Table(
         box=box.DOUBLE_EDGE,
         header_style="bold #ff007f",
         border_style="#00ffff"
     )
-    table.add_column("Tool Name", style="#00ffff", width=16)
-    table.add_column("Category", style="#ffff00", width=20)
-    table.add_column("Installation Status", width=18)
-    table.add_column("Detected Version", style="dim")
+    table.add_column("Tool Name", style="#00ffff", width=22)
+    table.add_column("Category", style="#ffff00", width=22)
+    table.add_column("Installation Status", width=20)
+    table.add_column("Source / Version", style="dim")
 
+    seen = set()
+
+    # 1. Tool Adapters
     for name, adapter in sorted(adapters.items()):
+        seen.add(name.lower())
         is_inst = adapter.is_installed()
         status_str = "[bold #00ff66][INSTALLED][/]" if is_inst else "[bold #ffff00][NOT INSTALLED][/]"
-        ver_str = adapter.detect_version()
-
+        ver_str = f"Adapter ({adapter.detect_version()})"
         table.add_row(adapter.name, adapter.category, status_str, ver_str)
+
+    # 2. Native Plugins (whatweb, nikto, gobuster, nuclei)
+    for name, plugin in sorted(plugins.items()):
+        if name.lower() not in seen:
+            seen.add(name.lower())
+            is_inst = plugin.is_installed()
+            status_str = "[bold #00ff66][INSTALLED][/]" if is_inst else "[bold #ffff00][NOT INSTALLED][/]"
+            category = getattr(plugin, "category", "security_assessment")
+            table.add_row(plugin.name, category, status_str, "Native Plugin")
+
+    # 3. MCP Tools
+    for tool in sorted(mcp_tools, key=lambda x: x.name):
+        if tool.name.lower() not in seen:
+            seen.add(tool.name.lower())
+            status_str = "[bold #00ff66][INSTALLED][/]" if tool.enabled else "[bold #ff0055][DISABLED][/]"
+            table.add_row(tool.name, tool.category, status_str, f"MCP ({tool.server_id})")
 
     console.print(table)
     console.print()
@@ -818,41 +844,89 @@ def tools_list_cmd(ctx: typer.Context):
 @tools_app.command("info")
 def tools_info_cmd(
     ctx: typer.Context,
-    tool_name: str = typer.Argument(..., help="Security tool adapter identifier name (e.g. nmap, owasp_zap, burp_suite, tshark, metasploit).")
+    tool_name: str = typer.Argument(..., help="Security tool identifier name (e.g. nmap, whatweb, nikto, gobuster, nuclei, zap, burp).")
 ):
     """Display detailed capability discovery, supported configuration options, and health metrics for a tool."""
     from core.adapters import get_adapter_registry
+    from core.registry import get_registry
+    from core.mcp import get_mcp_registry
 
-    registry = get_adapter_registry()
-    adapter = registry.get_adapter(tool_name)
+    adapter_reg = get_adapter_registry()
+    plugin_reg = get_registry()
+    mcp_reg = get_mcp_registry()
 
-    if not adapter:
-        console.print(f"[bold #ff0055]ERROR:[/] Unknown security tool adapter '{tool_name}'.")
-        console.print(f"[dim]Available tools: {', '.join(sorted(registry.list_adapters().keys()))}[/dim]\n")
+    t_key = tool_name.lower().strip()
+    adapter = adapter_reg.get_adapter(t_key)
+    plugin = plugin_reg.get_plugin(t_key)
+    mcp_tool = mcp_reg.get_tool(t_key)
+
+    if not adapter and not plugin and not mcp_tool:
+        all_tools = sorted(list(adapter_reg.list_adapters().keys()) + list(plugin_reg.list_plugins().keys()) + [t.name for t in mcp_reg.list_tools()])
+        console.print(f"[bold #ff0055]ERROR:[/] Unknown security tool '{tool_name}'.")
+        console.print(f"[dim]Available tools: {', '.join(all_tools)}[/dim]\n")
         raise typer.Exit(code=1)
 
-    caps = adapter.discover_capabilities()
-    is_inst = adapter.is_installed()
-    version = adapter.detect_version()
-    health_ok = adapter.health_check()
+    name = tool_name
+    category = "security_assessment"
+    description = "Security Tool Module"
+    is_inst = False
+    version = "Unknown"
+    health_ok = False
+    caps_api = False
+    caps_async = True
+    caps_auth = True
+    categories = []
+    options_schema = {}
 
-    console.print(f"\n[bold #00ffff]┌──[ ADAPTER METADATA: {adapter.name.upper()} ]──┐[/]\n")
+    if adapter:
+        name = adapter.name
+        category = adapter.category
+        description = adapter.description
+        is_inst = adapter.is_installed()
+        version = adapter.detect_version()
+        health_ok = adapter.health_check()
+        caps = adapter.discover_capabilities()
+        caps_api = caps.supports_api
+        caps_async = caps.supports_async
+        caps_auth = caps.supports_auth
+        categories = caps.categories
+        options_schema = caps.supported_options
+    elif plugin:
+        name = plugin.name
+        description = plugin.description
+        category = getattr(plugin, "category", "security_assessment")
+        is_inst = plugin.is_installed()
+        version = "Native Subprocess Plugin"
+        health_ok = is_inst
+        categories = [category]
+        options_schema = {"target": "Target host or URL"}
+    elif mcp_tool:
+        name = mcp_tool.name
+        description = mcp_tool.description
+        category = mcp_tool.category
+        is_inst = mcp_tool.enabled
+        version = f"MCP v{mcp_tool.version} ({mcp_tool.server_id})"
+        health_ok = (mcp_tool.health == "HEALTHY")
+        categories = [category]
+        options_schema = mcp_tool.input_schema
 
-    tree = Tree(f"[bold #ff007f]{adapter.name}[/] [dim]({adapter.description})[/dim]")
-    tree.add(f"[#00ffff]Category:[/] {adapter.category}")
+    console.print(f"\n[bold #00ffff]┌──[ TOOL METADATA: {name.upper()} ]──┐[/]\n")
+
+    tree = Tree(f"[bold #ff007f]{name}[/] [dim]({description})[/dim]")
+    tree.add(f"[#00ffff]Category:[/] {category}")
     tree.add(f"[#00ffff]Installation Status:[/] {'[bold #00ff66]Installed[/]' if is_inst else '[bold #ffff00]Not Installed / Offline[/]'}")
     tree.add(f"[#00ffff]Detected Version:[/] {version}")
     tree.add(f"[#00ffff]Health Check:[/] {'[bold #00ff66][HEALTHY][/]' if health_ok else '[bold #ff0055][UNHEALTHY / OFFLINE][/]'}")
 
     cap_node = tree.add("[bold #ffff00]Capabilities & Protocol Support[/]")
-    cap_node.add(f"[#00ffff]REST / RPC API Support:[/] {caps.supports_api}")
-    cap_node.add(f"[#00ffff]Asynchronous Execution:[/] {caps.supports_async}")
-    cap_node.add(f"[#00ffff]Target Authorization Check:[/] {caps.supports_auth}")
-    cap_node.add(f"[#00ffff]Assessment Categories:[/] {', '.join(caps.categories)}")
+    cap_node.add(f"[#00ffff]REST / RPC API Support:[/] {caps_api}")
+    cap_node.add(f"[#00ffff]Asynchronous Execution:[/] {caps_async}")
+    cap_node.add(f"[#00ffff]Target Authorization Check:[/] {caps_auth}")
+    cap_node.add(f"[#00ffff]Assessment Categories:[/] {', '.join(categories)}")
 
     opt_node = tree.add("[bold #ffff00]Supported Options Schema[/]")
-    for opt_key, opt_desc in caps.supported_options.items():
-        opt_node.add(f"[#00ff66]{opt_key}:[/] {opt_desc}")
+    for opt_k, opt_v in options_schema.items():
+        opt_node.add(f"[#00ff66]{opt_k}:[/] {opt_v}")
 
     console.print(tree)
     console.print()
@@ -860,30 +934,57 @@ def tools_info_cmd(
 
 @tools_app.command("health")
 def tools_health_cmd(ctx: typer.Context):
-    """Perform real-time operational health checks across all registered security tool adapters."""
+    """Perform real-time operational health checks across all registered adapters, plugins, and MCP tools."""
     from core.adapters import get_adapter_registry
+    from core.registry import get_registry
+    from core.mcp import get_mcp_registry
 
-    registry = get_adapter_registry()
-    adapters = registry.list_adapters()
+    adapter_reg = get_adapter_registry()
+    plugin_reg = get_registry()
+    mcp_reg = get_mcp_registry()
 
-    console.print("[bold #00ffff]┌──[ SECURITY TOOL HEALTH DIAGNOSTICS ]──┐[/]\n")
+    adapters = adapter_reg.list_adapters()
+    plugins = plugin_reg.list_plugins()
+    mcp_tools = mcp_reg.list_tools()
+
+    console.print("[bold #00ffff]┌──[ FULL SECURITY TOOL HEALTH DIAGNOSTICS ]──┐[/]\n")
 
     table = Table(
         box=box.DOUBLE_EDGE,
         header_style="bold #ff007f",
         border_style="#00ffff"
     )
-    table.add_column("Tool", style="#00ffff", width=16)
-    table.add_column("Category", style="#ffff00", width=20)
-    table.add_column("Operational Health", width=20)
-    table.add_column("Version / Endpoint", style="dim")
+    table.add_column("Tool", style="#00ffff", width=22)
+    table.add_column("Category", style="#ffff00", width=22)
+    table.add_column("Operational Health", width=22)
+    table.add_column("Version / Source", style="dim")
 
+    seen = set()
+
+    # 1. Tool Adapters
     for name, adapter in sorted(adapters.items()):
+        seen.add(name.lower())
         health_ok = adapter.health_check()
         health_str = "[bold #00ff66][HEALTHY / ONLINE][/]" if health_ok else "[bold #ff0055][UNHEALTHY / OFFLINE][/]"
         ver_str = adapter.detect_version()
-
         table.add_row(adapter.name, adapter.category, health_str, ver_str)
+
+    # 2. Native Plugins (whatweb, nikto, gobuster, nuclei)
+    for name, plugin in sorted(plugins.items()):
+        if name.lower() not in seen:
+            seen.add(name.lower())
+            is_inst = plugin.is_installed()
+            health_str = "[bold #00ff66][HEALTHY / ONLINE][/]" if is_inst else "[bold #ff0055][UNHEALTHY / OFFLINE][/]"
+            category = getattr(plugin, "category", "security_assessment")
+            table.add_row(plugin.name, category, health_str, "Native Plugin")
+
+    # 3. MCP Tools
+    for tool in sorted(mcp_tools, key=lambda x: x.name):
+        if tool.name.lower() not in seen:
+            seen.add(tool.name.lower())
+            health_ok = (tool.health == "HEALTHY" and tool.enabled)
+            health_str = "[bold #00ff66][HEALTHY / ONLINE][/]" if health_ok else "[bold #ff0055][UNHEALTHY / OFFLINE][/]"
+            table.add_row(tool.name, tool.category, health_str, f"MCP ({tool.server_id})")
 
     console.print(table)
     console.print()
