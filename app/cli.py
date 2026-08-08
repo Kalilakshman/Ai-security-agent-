@@ -269,9 +269,19 @@ def scan_command(
     raw_results = scan_result.model_dump()
 
     db.save_scan(
+        assessment_id=scan_result.assessment_id,
         target=target,
+        target_scope=target,
+        profile=profile,
+        llm_provider=cfg.llm.provider,
+        llm_model=cfg.llm.model,
+        mcp_servers=[s for s in getattr(cfg, "mcp_servers", [])],
         plugins_used=plan.selected_plugins,
+        tool_executions=[r.model_dump() for r in scan_result.step_results],
         execution_time_ms=scan_result.total_duration_ms,
+        retries_count=retries,
+        evidence_count=sum(len(r.evidence) for r in scan_result.step_results),
+        findings_count=scan_result.summary.get("total_findings", 0),
         status="COMPLETED",
         raw_results=raw_results,
         summary=scan_result.summary

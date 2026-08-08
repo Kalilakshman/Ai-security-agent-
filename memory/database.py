@@ -44,25 +44,47 @@ class DatabaseEngine:
         execution_time_ms: float,
         status: str,
         raw_results: Dict[str, Any],
+        assessment_id: Optional[str] = None,
+        target_scope: Optional[str] = None,
+        profile: str = "standard",
+        llm_provider: str = "openrouter",
+        llm_model: str = "default",
+        mcp_servers: Optional[List[str]] = None,
+        tool_executions: Optional[List[Dict[str, Any]]] = None,
+        retries_count: int = 0,
+        evidence_count: int = 0,
+        findings_count: int = 0,
         generated_reports: Optional[List[str]] = None,
         summary: Optional[Dict[str, Any]] = None,
+        policy_decisions: Optional[List[Dict[str, Any]]] = None,
     ) -> Optional[ScanRecord]:
         """Save a new scan record into the database with graceful error handling."""
         session: Session = self.SessionLocal()
         try:
             record = ScanRecord(
+                assessment_id=assessment_id,
                 target=target,
+                target_scope=target_scope,
+                profile=profile,
+                llm_provider=llm_provider,
+                llm_model=llm_model,
+                mcp_servers=mcp_servers or [],
                 plugins_used=plugins_used,
+                tool_executions=tool_executions or [],
                 execution_time_ms=execution_time_ms,
+                retries_count=retries_count,
+                evidence_count=evidence_count,
+                findings_count=findings_count,
                 status=status,
                 raw_results=raw_results,
                 generated_reports=generated_reports or [],
                 summary=summary or {},
+                policy_decisions=policy_decisions or [],
             )
             session.add(record)
             session.commit()
             session.refresh(record)
-            logger.info(f"Saved scan record #{record.id} for target '{target}' to database.")
+            logger.info(f"Saved scan record #{record.id} (Assessment ID: {assessment_id}) for target '{target}' to database.")
             return record
         except Exception as e:
             session.rollback()

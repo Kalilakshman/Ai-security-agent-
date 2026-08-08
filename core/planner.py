@@ -262,25 +262,20 @@ Formulate a context-aware security assessment execution plan in JSON.
         profile: str,
         healthy_tools: List[Dict[str, Any]]
     ) -> ExecutionPlan:
-        """Generate structured deterministic fallback plan when LLM is offline."""
+        """Generate structured deterministic fallback plan when LLM is offline or returns invalid response."""
         tool_names = [t["name"] for t in healthy_tools]
 
-        if target_type == "web_application":
-            relevant = [t for t in tool_names if t in ("whatweb", "owasp_zap", "nikto", "burp_suite", "gobuster", "nmap")]
-        else:
-            relevant = [t for t in tool_names if t in ("nmap", "tshark", "metasploit", "nuclei")]
-
-        if not relevant:
-            relevant = tool_names[:2] if tool_names else ["nmap"]
+        if not tool_names:
+            tool_names = ["nmap"]
 
         steps = []
-        for idx, t_name in enumerate(relevant[:4], 1):
+        for idx, t_name in enumerate(tool_names, 1):
             steps.append(PlannedStep(
                 step_number=idx,
                 tool=t_name,
                 purpose=f"Security assessment using {t_name}",
-                selection_reason=f"Selected based on target type '{target_type}' and tool availability.",
-                depends_on=[idx - 1] if idx > 1 else [],
+                selection_reason=f"Selected based on availability of operational tool '{t_name}'.",
+                depends_on=[],
                 estimated_duration_seconds=60.0 if profile == "fast" else 300.0,
                 options={"profile": profile}
             ))
@@ -294,5 +289,5 @@ Formulate a context-aware security assessment execution plan in JSON.
             selected_plugins=[s.tool for s in steps],
             execution_order=steps,
             estimated_duration_seconds=sum(s.estimated_duration_seconds for s in steps),
-            reasoning=f"Structured fallback plan generated for target type '{target_type}' using installed tools."
+            reasoning=f"Structured execution plan incorporating all {len(tool_names)} operational tools."
         )
