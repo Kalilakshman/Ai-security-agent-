@@ -8,6 +8,45 @@ Production-grade, modular, DevSecOps-ready **AI Security Orchestrator CLI** buil
 
 ---
 
+## 🛠️ Complete Tool Setup & Execution Guide for Kali Linux
+
+### 1. External Daemon Setup (ZAP, Metasploit, Burp, Tshark)
+
+Run security assessment daemons in the background on Kali Linux before scanning:
+
+```bash
+# 1. OWASP ZAP REST API Daemon
+zaproxy -daemon -port 8080 -config api.disablekey=true &
+export ZAP_API_URL="http://localhost:8080"
+
+# 2. Metasploit Framework RPC Daemon
+msfrpcd -U msf -P msfpassword -S -a 127.0.0.1 -p 55553 &
+export MSF_RPC_URL="http://127.0.0.1:55553"
+
+# 3. Wireshark / Tshark CLI Packet Capture
+sudo apt update && sudo apt install -y tshark nmap whatweb nikto gobuster nuclei
+
+# 4. Verify Health of All Integrated Security Tools
+security-ai tools health
+```
+
+---
+
+## 🔌 Model Context Protocol (MCP) Subsystem (`security-ai mcp`)
+
+```bash
+# 1. List registered MCP servers
+security-ai mcp servers
+
+# 2. List exposed MCP tools
+security-ai mcp tools
+
+# 3. Register a custom MCP server
+security-ai mcp register -i custom_mcp -n "Custom Security MCP" -t http -u "http://localhost:8000/mcp"
+```
+
+---
+
 ## 🏛️ System Architecture
 
 ```
