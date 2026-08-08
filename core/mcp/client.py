@@ -39,7 +39,7 @@ class MCPClient:
             return self._call_tool_http(tool_name, arguments, timeout)
         return self._call_tool_stdio(tool_name, arguments, timeout)
 
-    def ping((self)) -> bool:
+    def ping(self) -> bool:
         """Ping the MCP server connection."""
         try:
             if self.config.transport in ("http", "sse"):

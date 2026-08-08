@@ -80,7 +80,7 @@ class AIPlanner:
             return "network_host"
         return "domain"
 
-    def discover_healthy_tools((self)) -> List[Dict[str, Any]]:
+    def discover_healthy_tools(self) -> List[Dict[str, Any]]:
         """Query ToolAdapterRegistry, PluginRegistry, and MCPServerRegistry for installed & healthy tools."""
         available_tools = []
         seen = set()
