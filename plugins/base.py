@@ -25,6 +25,7 @@ class StandardPluginOutput(BaseModel):
       "status": "COMPLETED",
       "timestamp": "2026-08-06T10:57:49Z",
       "findings": [...],
+      "evidence": [...],
       "errors": [...],
       "metadata": {}
     }
@@ -37,6 +38,7 @@ class StandardPluginOutput(BaseModel):
         description="ISO 8601 UTC timestamp."
     )
     findings: List[Dict[str, Any]] = Field(default_factory=list, description="Parsed structured findings.")
+    evidence: List[Dict[str, Any]] = Field(default_factory=list, description="Raw evidence payload items.")
     errors: List[str] = Field(default_factory=list, description="Execution error messages or stderr lines.")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Execution metrics and metadata.")
 

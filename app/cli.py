@@ -280,7 +280,7 @@ def scan_command(
         tool_executions=[r.model_dump() for r in scan_result.step_results],
         execution_time_ms=scan_result.total_duration_ms,
         retries_count=retries,
-        evidence_count=sum(len(r.evidence) for r in scan_result.step_results),
+        evidence_count=sum(len(getattr(r, "evidence", getattr(r, "findings", []))) for r in scan_result.step_results),
         findings_count=scan_result.summary.get("total_findings", 0),
         status="COMPLETED",
         raw_results=raw_results,
