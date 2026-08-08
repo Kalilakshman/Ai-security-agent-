@@ -2,7 +2,7 @@
 Central Tool Adapter Registry and automatic PluginRegistry bridge.
 """
 
-from typing import Dict, List, Optional, Type
+from typing import Dict, List, Optional, Type, Any
 from core.adapters.base import BaseToolAdapter
 from core.adapters.nmap import NmapAdapter
 from core.adapters.zap import OWASPZAPAdapter
