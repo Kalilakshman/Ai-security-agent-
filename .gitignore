@@ -28,20 +28,33 @@ wheels/
 .venv
 venv/
 ENV/
+env/
 
-# Databases
+# Databases & Runtime State
 *.db
 *.sqlite
 *.sqlite3
+checkpoints/
+policy_audit.log
+scan_*.json
 
 # Output Report Artifacts
 reports_output/
-*.md
 *.html
 *.pdf
+
+# Exception: Keep documentation markdown files
 !README.md
 !walkthrough.md
 !implementation_plan.md
+!ARCHITECTURE_AUDIT.md
+!ARCHITECTURE.md
+!MCP_GUIDE.md
+!LLM_GUIDE.md
+!SECURITY_MODEL.md
+!CONFIGURATION.md
+!CLI_REFERENCE.md
+!PLUGIN_DEVELOPMENT.md
 
 # IDEs and Editors
 .vscode/

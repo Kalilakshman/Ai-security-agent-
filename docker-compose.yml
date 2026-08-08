@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  security-orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: security-ai-orchestrator:latest
+    container_name: security-ai-cli
+    environment:
+      - SECURITY_AI_LLM__PROVIDER=openrouter
+      - SECURITY_AI_LLM__MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    volumes:
+      - ./reports_output:/app/reports_output
+      - ./checkpoints:/app/checkpoints
+      - ./policy_audit.log:/app/policy_audit.log
+    command: ["doctor"]

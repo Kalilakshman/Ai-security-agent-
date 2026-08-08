@@ -6,13 +6,27 @@ from core.interfaces import IExecutor, ILLMProvider, IPlugin, ExecutionResult
 from core.config import load_config, AppConfig
 from core.logger import setup_logger, get_logger
 from core.executor import SafeExecutor
-from core.llm import OpenRouterClient
+from core.llm import (
+    LLMProvider,
+    LLMResponse,
+    OpenRouterLLMProvider,
+    OpenAICompatibleProvider,
+    OllamaLLMProvider,
+    get_llm_provider,
+    OpenRouterClient,
+)
 from core.planner import AIPlanner, ExecutionPlan
 from core.workflow import WorkflowEngine, UnifiedScanResult
 
 __all__ = [
     "IExecutor",
     "ILLMProvider",
+    "LLMProvider",
+    "LLMResponse",
+    "OpenRouterLLMProvider",
+    "OpenAICompatibleProvider",
+    "OllamaLLMProvider",
+    "get_llm_provider",
     "IPlugin",
     "ExecutionResult",
     "load_config",

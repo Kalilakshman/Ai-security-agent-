@@ -21,7 +21,7 @@ class PluginManager:
         self._registry: Dict[str, IPlugin] = {}
         self._status: Dict[str, PluginStatus] = {}
 
-    def discover_plugins() -> List[str]:
+    def discover_plugins(self) -> List[str]:
         """Scan plugins directory for potential Python plugin modules."""
         if not self.plugins_dir.exists() or not self.plugins_dir.is_dir():
             logger.debug(f"Plugins directory '{self.plugins_dir}' does not exist.")
@@ -57,7 +57,7 @@ class PluginManager:
         """Retrieve a loaded plugin instance by name."""
         return self._registry.get(name)
 
-    def list_plugins() -> Dict[str, Dict[str, str]]:
+    def list_plugins(self) -> Dict[str, Dict[str, str]]:
         """Return metadata for all registered plugins."""
         info = {}
         for name, plugin in self._registry.items():

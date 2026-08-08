@@ -1,230 +1,148 @@
 # 🤖 AI Security Orchestrator CLI (`security-ai`)
 
-Production-grade, modular, DevSecOps-ready AI Security Orchestrator CLI built with **Python 3.12**, **Typer**, **Rich**, **Pydantic v2**, **PyYAML**, and **SQLAlchemy 2.x**.
+Production-grade, modular, DevSecOps-ready **AI Security Orchestrator CLI** built with **Python 3.12**, **Typer**, **Rich**, **Pydantic v2**, **PyYAML**, and **SQLAlchemy 2.x**.
 
 > [!IMPORTANT]
 > **Authorization & Ethical Scope**  
-> This software is strictly intended for authorized penetration tests, internal security assessments, corporate environments with written permission, CTF environments, and isolated personal lab environments. Never assess unauthorized target systems.
+> This software is strictly intended for authorized penetration tests, internal security assessments, corporate environments with explicit written permission, CTF environments, and isolated personal lab environments. Never assess unauthorized target systems.
 
 ---
 
 ## 🏛️ System Architecture
 
 ```
-                                ┌───────────────────────────────────┐
-                                │            Typer CLI              │
-                                │           (app/cli.py)            │
-                                └─────────────────┬─────────────────┘
-                                                  │
-                 ┌────────────────────────────────┼────────────────────────────────┐
-                 ▼                                ▼                                ▼
-    ┌───────────────────────────┐   ┌───────────────────────────┐   ┌───────────────────────────┐
-    │        AI Planner         │   │   Dynamic Plugin Registry │   │     OpenRouter Client     │
-    │     (core/planner.py)     │   │     (core/registry.py)    │   │       (core/llm.py)       │
-    └────────────┬──────────────┘   └─────────────┬─────────────┘   └─────────────┬─────────────┘
-                 │                                │                               │
-                 └────────────────────────────────┼───────────────────────────────┘
-                                                  │
-                                                  ▼
-                                ┌───────────────────────────────────┐
-                                │          Workflow Engine          │
-                                │        (core/workflow.py)         │
-                                └─────────────────┬─────────────────┘
-                                                  │ (Routes Tool Executions via SafeExecutor)
-                     ┌────────────────────────────┼────────────────────────────┐
-                     ▼                            ▼                            ▼
-        ┌──────────────────────────┐ ┌──────────────────────────┐ ┌──────────────────────────┐
-        │       nmap Plugin        │ │      whatweb Plugin      │ │       nikto Plugin       │
-        │    (plugins/nmap.py)     │ │   (plugins/whatweb.py)   │ │    (plugins/nikto.py)    │
-        └────────────┬─────────────┘ └────────────┬─────────────┘ └────────────┬─────────────┘
-                     │                            │                            │
-                     └────────────────────────────┼────────────────────────────┘
-                                                  │ (Collects Standard JSON Outputs)
-                                                  ▼
-                                ┌───────────────────────────────────┐
-                                │       AI Results Analyzer         │
-                                │        (core/analyzer.py)         │
-                                └─────────────────┬─────────────────┘
-                                                  │ (Facts vs Inferences Separation)
-                     ┌────────────────────────────┼────────────────────────────┐
-                     ▼                            ▼                            ▼
-        ┌──────────────────────────┐ ┌──────────────────────────┐ ┌──────────────────────────┐
-        │     Markdown Reporter    │ │       HTML Reporter      │ │       PDF Reporter       │
-        │   (reports/markdown.py)  │ │     (reports/html.py)    │ │     (reports/pdf.py)     │
-        └──────────────────────────┘ └──────────────────────────┘ └──────────────────────────┘
+                               ┌───────────────────────────────────┐
+                               │     Professional Terminal UI      │
+                               │      (app/ui.py & app/cli.py)     │
+                               └─────────────────┬─────────────────┘
+                                                 │
+                ┌────────────────────────────────┼────────────────────────────────┐
+                ▼                                ▼                                ▼
+   ┌───────────────────────────┐   ┌───────────────────────────┐   ┌───────────────────────────┐
+   │    Provider-Independent   │   │  Security Policy Engine   │   │  MCP Gateway & Server Hub │
+   │   LLM Provider Architecture│  │     (core/policy.py)      │   │    (core/mcp/gateway.py)  │
+   └────────────┬──────────────┘   └─────────────┬─────────────┘   └─────────────┬─────────────┘
+                │                                │                               │
+                └────────────────────────────────┼───────────────────────────────┘
+                                                 │
+                                                 ▼
+                               ┌───────────────────────────────────┐
+                               │    Upgraded AI Strategic Planner  │
+                               │        (core/planner.py)          │
+                               └─────────────────┬─────────────────┘
+                                                 │
+                                                 ▼
+                               ┌───────────────────────────────────┐
+                               │    Resilient Execution Engine     │
+                               │        (core/workflow.py)         │
+                               └─────────────────┬─────────────────┘
+                                                 │ (Routes Tool Executions & Enforces Retries/Timeouts)
+                     ┌───────────────────────────┼───────────────────────────┐
+                     ▼                           ▼                           ▼
+        ┌─────────────────────────┐ ┌─────────────────────────┐ ┌─────────────────────────┐
+        │   Nmap / ZAP Adapters   │ │   Burp / Tshark Adapters│ │    Metasploit Adapter   │
+        │  (core/adapters/nmap)   │ │  (core/adapters/tshark) │ │ (core/adapters/metasp)  │
+        └────────────┬────────────┘ └────────────┬────────────┘ └────────────┬────────────┘
+                     │                           │                           │
+                     └───────────────────────────┼───────────────────────────┘
+                                                 │ (Normalizes JSON Evidence & Artifacts)
+                                                 ▼
+                               ┌───────────────────────────────────┐
+                               │   Evidence & Results Analyzer     │
+                               │        (core/analyzer.py)         │
+                               └─────────────────┬─────────────────┘
+                                                 │ (Observed Facts vs. AI Inferences Separation)
+                     ┌───────────────────────────┼───────────────────────────┐
+                     ▼                           ▼                           ▼
+        ┌─────────────────────────┐ ┌─────────────────────────┐ ┌─────────────────────────┐
+        │    Markdown Reporter    │ │      HTML Reporter      │ │      PDF Reporter       │
+        │  (reports/markdown.py)  │ │    (reports/html.py)    │ │    (reports/pdf.py)     │
+        └─────────────────────────┘ └─────────────────────────┘ └─────────────────────────┘
 ```
 
 ---
 
-## 📦 Installation Guide
+## 📦 Quickstart & Installation
 
-### Option 1: Kali Linux / Ubuntu / Debian Installation
 ```bash
-# 1. Update system package index & install required scanner binaries
-sudo apt update
-sudo apt install -y python3 python3-pip python3-venv git nmap whatweb nikto gobuster nuclei
-
-# 2. Clone repository & navigate to directory
+# Clone repository
 git clone https://github.com/Kalilakshman/Ai-security-agent-.git
 cd Ai-security-agent-
 
-# 3. Create & activate Python virtual environment
+# Create virtual environment (Python 3.12)
 python3 -m venv .venv
 source .venv/bin/activate
 
-# 4. Install package in editable mode
+# Install package in editable mode with development dependencies
 pip install -e .[dev]
 
-# 5. Export OpenRouter API key
+# Set API key for OpenRouter / OpenAI / Ollama
 export OPENROUTER_API_KEY="your-openrouter-api-key-here"
 
-# 6. Verify installation
+# Run doctor diagnostic
 security-ai doctor
 ```
 
-### Option 2: Windows / Generic Native Installation (Python 3.12)
+---
+
+## 💻 Primary Commands
+
+### 1. Security Scan (`security-ai scan`)
 ```bash
-# Clone or navigate to codebase
-cd security-orchestrator
-
-# Create virtual environment
-python -m venv .venv
-
-# Activate virtual environment (Windows PowerShell)
-.venv\Scripts\Activate.ps1
-
-# Install in editable mode
-pip install -e .[dev]
+security-ai scan example.com --profile deep --concurrency 4 --retries 1 -y
 ```
 
-### Option 3: Docker Container Setup
+### 2. Strategic AI Plan (`security-ai plan`)
 ```bash
-# Build multi-stage Docker image
-make docker-build
+security-ai plan example.com --profile deep
+```
 
-# Run CLI doctor diagnostic inside container
-docker run --rm security-ai-orchestrator doctor
+### 3. Interactive Operations Dashboard (`security-ai dashboard`)
+```bash
+security-ai dashboard --target example.com --profile deep
+```
+
+### 4. LLM Provider Hub (`security-ai llm`)
+```bash
+security-ai llm providers
+security-ai llm models
+security-ai llm select --provider openai --model gpt-4o
+security-ai llm test
+```
+
+### 5. Security Tools Matrix (`security-ai tools`)
+```bash
+security-ai tools list
+security-ai tools info nmap
+security-ai tools health
+```
+
+### 6. Multi-Format Report Generation (`security-ai report`)
+```bash
+security-ai report scan_example_com.json --md --html --pdf -o reports_output
 ```
 
 ---
 
-## 🔑 OpenRouter API Setup Guide
+## 📚 Complete Documentation Guides
 
-Set your OpenRouter API key as an environment variable:
-```bash
-# Windows PowerShell
-$env:OPENROUTER_API_KEY="sk-or-v1-your-key-here"
-
-# Linux / macOS
-export OPENROUTER_API_KEY="sk-or-v1-your-key-here"
-```
-Or edit `config/config.yaml`:
-```yaml
-openrouter:
-  api_key: "your-openrouter-api-key-here"
-  default_model: "nvidia/nemotron-3-ultra-550b-a55b:free"
-```
+- [ARCHITECTURE.md](file:///c:/Users/kalilakshman/project/security-orchestrator/ARCHITECTURE.md) — Enterprise System Architecture & Component Interactions
+- [SECURITY_MODEL.md](file:///c:/Users/kalilakshman/project/security-orchestrator/SECURITY_MODEL.md) — Security Policy Engine, Scope Validation & Guardrails
+- [MCP_GUIDE.md](file:///c:/Users/kalilakshman/project/security-orchestrator/MCP_GUIDE.md) — Model Context Protocol (MCP) Integration Specification
+- [LLM_GUIDE.md](file:///c:/Users/kalilakshman/project/security-orchestrator/LLM_GUIDE.md) — Provider-Independent LLM Architecture Guide
+- [CONFIGURATION.md](file:///c:/Users/kalilakshman/project/security-orchestrator/CONFIGURATION.md) — Configuration Reference & Environment Variables
+- [CLI_REFERENCE.md](file:///c:/Users/kalilakshman/project/security-orchestrator/CLI_REFERENCE.md) — Typer CLI Command Reference
+- [PLUGIN_DEVELOPMENT.md](file:///c:/Users/kalilakshman/project/security-orchestrator/PLUGIN_DEVELOPMENT.md) — Tool Adapter & BasePlugin Extension Guide
 
 ---
 
-## 💻 CLI Commands & Usage Examples
-
-### 1. Automated Security Assessment Scan (`scan`)
-Run an automated security scan against an authorized target with a specific assessment profile (`fast`, `standard`, or `deep`):
-```bash
-# Standard profile (Default timeouts)
-security-ai scan scanme.nmap.org
-
-# Deep profile (Long-running assessment with extended timeouts up to 2 hours)
-security-ai scan scanme.nmap.org --profile deep
-
-# Fast profile (Quick discovery with short timeouts)
-security-ai scan scanme.nmap.org --profile fast --yes
-```
-
-### 2. AI-Driven Assessment Planning (`plan`)
-Formulate an AI-driven security assessment plan:
-```bash
-# View AI assessment plan
-security-ai plan scanme.nmap.org --profile deep
-
-# Generate plan and prompt for authorization to execute immediately
-security-ai plan scanme.nmap.org --profile deep --execute
-```
-
-### 3. Environment & API Diagnostics (`doctor`)
-```bash
-security-ai doctor
-```
-
-### 4. View System Tool & Plugin Status (`plugins`)
-```bash
-security-ai plugins
-```
-
-### 5. Display Configuration & Timeouts (`config`)
-```bash
-security-ai config
-```
-
-### 6. Generate Multi-Format Reports (`report`)
-Analyze normalized scan JSON results and generate Markdown, HTML, and PDF reports:
-```bash
-security-ai report scan_scanme.nmap.org.json --md --html --pdf -o my_reports/
-```
-
-### 7. View Historical Assessments (`history`)
-```bash
-security-ai history --limit 10
-```
-
----
-
-## ⏱️ Assessment Profiles & Timeout Controls
-
-| Tool Plugin | Fast Profile (`-p fast`) | Standard Profile (`-p standard`) | Deep Profile (`-p deep`) |
-| :--- | :--- | :--- | :--- |
-| **`nmap`** | 120s (2m) | 600s (10m) | 1800s (30m) |
-| **`whatweb`** | 60s (1m) | 300s (5m) | 900s (15m) |
-| **`nikto`** | 180s (3m) | 900s (15m) | 2400s (40m) |
-| **`gobuster`** | 180s (3m) | 1200s (20m) | 3600s (60m) |
-| **`nuclei`** | 300s (5m) | 1800s (30m) | 7200s (120m) |
-
----
-
-## 🧩 Plugin Development Guide
-
-To create a new tool wrapper plugin, create a single `.py` file inside `plugins/` (e.g. `plugins/mytool.py`):
-
-```python
-from typing import Dict, List, Any, Optional
-from plugins.base import BasePlugin
-
-class MyToolPlugin(BasePlugin):
-    @property
-    def name(self) -> str:
-        return "mytool"
-
-    @property
-    def description(self) -> str:
-        return "My custom security tool plugin."
-
-    def build_command(self, target: str, options: Optional[Dict[str, Any]] = None) -> List[str]:
-        return ["mytool", "--target", target]
-
-    def parse(self, stdout: str, stderr: str) -> List[Dict[str, Any]]:
-        return [{"raw": stdout.strip()}]
-```
-No core code or planner changes required — `PluginRegistry` discovers and registers it automatically!
-
----
-
-## 🛠️ Developer & Makefile Commands
+## 🛠️ Testing & Quality Controls
 
 ```bash
-make install    # Install dependencies
-make test       # Run pytest test suite
-make lint       # Run ruff and mypy linters
-make format     # Format code using ruff
-make clean      # Clean python build artifacts
+# Run complete unit test suite
+pytest tests/ -v
+
+# Run linting and type checks
+ruff check .
+mypy app/ core/ plugins/ memory/ reports/
 ```

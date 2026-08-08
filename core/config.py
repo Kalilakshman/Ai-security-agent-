@@ -13,6 +13,71 @@ from pydantic import BaseModel, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+class LLMConfig(BaseModel):
+    """Configuration schema for provider-independent LLM subsystem."""
+    provider: str = Field(
+        default="openrouter",
+        description="Active LLM provider backend ('openrouter', 'openai', 'ollama')."
+    )
+    model: str = Field(
+        default="nvidia/nemotron-3-ultra-550b-a55b:free",
+        description="Active LLM model identifier."
+    )
+    api_endpoint: str = Field(
+        default="https://openrouter.ai/api/v1",
+        description="Base API endpoint URL."
+    )
+    api_key: SecretStr = Field(
+        default=SecretStr(""),
+        description="API Key secret string."
+    )
+    temperature: float = Field(
+        default=0.7,
+        description="Sampling temperature for LLM outputs."
+    )
+    max_tokens: int = Field(
+        default=2048,
+        description="Maximum tokens allowed in completion response."
+    )
+    timeout_seconds: float = Field(
+        default=45.0,
+        description="API request timeout in seconds."
+    )
+    fallback_model: str = Field(
+        default="google/gemini-2.0-flash-exp:free",
+        description="Fallback free model for OpenRouter."
+    )
+    site_url: str = Field(
+        default="https://github.com/security-ai-orchestrator",
+        description="HTTP Referer header required by OpenRouter."
+    )
+    app_name: str = Field(
+        default="AI Security Orchestrator CLI",
+        description="X-Title header required by OpenRouter."
+    )
+
+    def get_resolved_api_key(self) -> str:
+        """Resolve API key from explicit setting, env vars, or fallback."""
+        direct_key = self.api_key.get_secret_value() if self.api_key else ""
+        if direct_key and direct_key != "YOUR_OPENROUTER_API_KEY_HERE":
+            return direct_key
+
+        if self.provider == "openai":
+            env_key = os.getenv("OPENAI_API_KEY")
+            if env_key:
+                return env_key
+        elif self.provider == "openrouter":
+            env_key = os.getenv("OPENROUTER_API_KEY")
+            if env_key:
+                return env_key
+
+        env_generic = os.getenv("SECURITY_AI_LLM__API_KEY")
+        if env_generic:
+            return env_generic
+
+        return direct_key
+
+
 class OpenRouterConfig(BaseModel):
     """Configuration schema for OpenRouter LLM backend provider."""
     api_key: SecretStr = Field(
@@ -167,6 +232,46 @@ class LoggingConfig(BaseModel):
     )
 
 
+class PolicyConfig(BaseModel):
+    """Configuration schema for Authorization and Security Policy Engine."""
+    allowed_targets: List[str] = Field(
+        default_factory=lambda: ["127.0.0.1", "localhost", "192.168.*", "10.*", "*.local"],
+        description="Glob/Regex patterns of targets explicitly permitted for scanning."
+    )
+    denied_targets: List[str] = Field(
+        default_factory=lambda: ["*.gov", "*.mil", "169.254.169.254"],
+        description="Glob/Regex patterns of targets strictly prohibited from scanning."
+    )
+    tool_allowlist: List[str] = Field(
+        default_factory=lambda: ["nmap", "whatweb", "nikto", "gobuster", "nuclei", "owasp_zap", "burp_suite", "tshark", "metasploit"],
+        description="Safelist of tools allowed for execution."
+    )
+    tool_denylist: List[str] = Field(
+        default_factory=list,
+        description="Blocklist of tools explicitly prohibited from execution."
+    )
+    allowed_profiles: List[str] = Field(
+        default_factory=lambda: ["fast", "standard", "deep"],
+        description="Assessment profiles permitted for user selection."
+    )
+    max_execution_time_seconds: float = Field(
+        default=3600.0,
+        description="Absolute maximum execution time limit across all steps."
+    )
+    require_explicit_auth: bool = Field(
+        default=True,
+        description="Require explicit user authorization acknowledgement before execution."
+    )
+    allow_destructive_tools: bool = Field(
+        default=False,
+        description="Allow tools marked with destructive capabilities."
+    )
+    audit_log_file: Optional[str] = Field(
+        default="policy_audit.log",
+        description="Log file path for security policy decision audit entries."
+    )
+
+
 class AppConfig(BaseSettings):
     """Top-level application settings container combining YAML and Environment inputs."""
     model_config = SettingsConfigDict(
@@ -176,6 +281,8 @@ class AppConfig(BaseSettings):
         extra="ignore"
     )
 
+    policy: PolicyConfig = Field(default_factory=PolicyConfig)
+    llm: LLMConfig = Field(default_factory=LLMConfig)
     openrouter: OpenRouterConfig = Field(default_factory=OpenRouterConfig)
     executor: ExecutorConfig = Field(default_factory=ExecutorConfig)
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
@@ -194,6 +301,23 @@ class AppConfig(BaseSettings):
         try:
             with open(path, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f) or {}
+
+            # Sync openrouter config with llm config if llm section is not explicitly in YAML
+            if "openrouter" in data and "llm" not in data:
+                or_data = data["openrouter"]
+                data["llm"] = {
+                    "provider": "openrouter",
+                    "model": or_data.get("default_model", "nvidia/nemotron-3-ultra-550b-a55b:free"),
+                    "api_endpoint": or_data.get("base_url", "https://openrouter.ai/api/v1"),
+                    "api_key": or_data.get("api_key", ""),
+                    "temperature": or_data.get("temperature", 0.7),
+                    "max_tokens": or_data.get("max_tokens", 2048),
+                    "timeout_seconds": or_data.get("timeout_seconds", 45.0),
+                    "fallback_model": or_data.get("fallback_model", "google/gemini-2.0-flash-exp:free"),
+                    "site_url": or_data.get("site_url", "https://github.com/security-ai-orchestrator"),
+                    "app_name": or_data.get("app_name", "AI Security Orchestrator CLI"),
+                }
+
             return cls.model_validate(data)
         except Exception as e:
             raise ValueError(f"Failed to parse YAML configuration at '{yaml_path}': {str(e)}") from e

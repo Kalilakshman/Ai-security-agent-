@@ -98,13 +98,15 @@ def doctor(ctx: typer.Context):
     except Exception as e:
         table.add_row("Subprocess Sandbox", "[bold #ff0055][OFFLINE][/]", str(e))
 
-    # 4. OpenRouter API Health Check
-    llm = OpenRouterLLMProvider(cfg.openrouter)
-    api_ok = asyncio.run(llm.health_check())
+    # 4. LLM Subsystem Health Check
+    from core.llm import get_llm_provider
+    prov = get_llm_provider(config=cfg)
+    p_name = prov.provider_name().upper()
+    api_ok = prov.health_check()
     if api_ok:
-        table.add_row("OpenRouter AI Hub", "[bold #00ff66][ONLINE][/]", f"Connected to OpenRouter API (Model: {cfg.openrouter.default_model})")
+        table.add_row(f"LLM Hub ({p_name})", "[bold #00ff66][ONLINE][/]", f"Connected to {prov.provider_name()} API (Model: {cfg.llm.model})")
     else:
-        table.add_row("OpenRouter AI Hub", "[bold #ff0055][OFFLINE][/]", "Unable to reach OpenRouter API or invalid API key")
+        table.add_row(f"LLM Hub ({p_name})", "[bold #ff0055][OFFLINE][/]", f"Unable to reach {prov.provider_name()} API or invalid credentials")
 
     console.print(table)
     console.print("\n[dim #00ffff]Diagnostic check sequence completed.[/]\n")
@@ -124,15 +126,16 @@ def show_config(ctx: typer.Context):
     
     tree = Tree("[bold #ff007f]AppConfig Core Root[/]")
     
-    # OpenRouter Node
-    or_node = tree.add("[bold #ffff00]OpenRouter LLM Neural Hub[/]")
-    or_node.add(f"[#00ffff]Base URL:[/] {cfg.openrouter.base_url}")
-    or_node.add(f"[#00ffff]Default Free Model:[/] {cfg.openrouter.default_model}")
-    or_node.add(f"[#00ffff]Fallback Model:[/] {cfg.openrouter.fallback_model}")
-    or_node.add(f"[#00ffff]Max Tokens:[/] {cfg.openrouter.max_tokens}")
-    or_node.add(f"[#00ffff]Temperature:[/] {cfg.openrouter.temperature}")
-    masked_key = "sk-or-v1-***" + cfg.openrouter.api_key.get_secret_value()[-6:] if cfg.openrouter.api_key else "Not Set"
-    or_node.add(f"[#00ffff]API Key:[/] [dim]{masked_key}[/]")
+    # LLM Subsystem Node
+    llm_node = tree.add("[bold #ffff00]Provider-Independent LLM Neural Hub[/]")
+    llm_node.add(f"[#00ffff]Provider:[/] {cfg.llm.provider.upper()}")
+    llm_node.add(f"[#00ffff]Active Model:[/] {cfg.llm.model}")
+    llm_node.add(f"[#00ffff]API Endpoint:[/] {cfg.llm.api_endpoint}")
+    llm_node.add(f"[#00ffff]Max Tokens:[/] {cfg.llm.max_tokens}")
+    llm_node.add(f"[#00ffff]Temperature:[/] {cfg.llm.temperature}")
+    raw_key = cfg.llm.get_resolved_api_key()
+    masked_key = "sk-***" + raw_key[-6:] if raw_key and len(raw_key) > 6 else ("Set" if raw_key else "Not Set / Local")
+    llm_node.add(f"[#00ffff]API Key:[/] [dim]{masked_key}[/]")
 
     # Executor Node
     exec_node = tree.add("[bold #ffff00]Safe Subprocess Sandbox[/]")
@@ -197,19 +200,24 @@ def list_plugins(ctx: typer.Context):
 def scan_command(
     ctx: typer.Context,
     target: str = typer.Argument(..., help="Target IP address, hostname, domain, or URL."),
-    profile: str = typer.Option("standard", "--profile", "-p", help="Assessment profile: fast, standard, or deep."),
+    profile: str = typer.Option("standard", "--profile", "-p", help="Assessment profile: fast, standard, deep, or custom."),
+    concurrency: int = typer.Option(3, "--concurrency", "-c", help="Maximum worker threads for parallel DAG execution."),
+    retries: int = typer.Option(0, "--retries", "-r", help="Maximum retry attempts for transient step failures."),
+    resume: Optional[str] = typer.Option(None, "--resume", help="Optional assessment ID or 'latest' to resume from checkpoint."),
     auto_approve: bool = typer.Option(False, "--yes", "-y", help="Automatically confirm target authorization.")
 ):
-    """Run automated security scanning workflow against an authorized target."""
+    """Run automated resilient security scanning workflow against an authorized target."""
     from core.planner import AIPlanner
     from core.workflow import WorkflowEngine
+    from memory.database import get_db_engine
+    import json
 
     console.print(f"\n[bold #00ffff]┌──[ 🚀 INITIATING AUTOMATED CYBER SCANNER ]──┐[/]")
-    console.print(f"[bold #00ffff]Target:[/] [bold #ffff00]{target}[/] | [bold #00ffff]Profile:[/] [bold #ff007f]{profile.upper()}[/]\n")
+    console.print(f"[bold #00ffff]Target:[/] [bold #ffff00]{target}[/] | [bold #00ffff]Profile:[/] [bold #ff007f]{profile.upper()}[/] | [bold #00ffff]Concurrency:[/] {concurrency}\n")
 
     cfg: AppConfig = ctx.obj["config"]
     planner = AIPlanner()
-    engine = WorkflowEngine()
+    engine = WorkflowEngine(config=cfg)
 
     if not engine.validate_target(target):
         console.print(f"[bold #ff0055]CRITICAL ERROR:[/] Target string '{target}' is invalid format.")
@@ -220,6 +228,10 @@ def scan_command(
         if not confirm:
             console.print("[bold #ff0055]SCAN ABORTED: Target authorization rejected.[/]\n")
             raise typer.Exit(code=1)
+
+    resume_id = None
+    if resume:
+        resume_id = None if resume.lower() == "latest" else resume
 
     with console.status(f"[bold #00ff66]⚡ Formulating AI Execution Plan (Profile: {profile.upper()})...[/]"):
         plan = planner.generate_plan(target)
@@ -243,54 +255,26 @@ def scan_command(
     console.print(table)
     console.print()
 
-    step_outputs = []
-    total_time_ms = 0.0
-
-    for step in plan.execution_order:
-        tool_name = step.tool
-        timeout_val = cfg.timeouts.get_timeout(tool_name, profile=profile)
-        plugin = engine.registry.get_plugin(tool_name)
-
-        if not plugin:
-            continue
-
-        step_options = dict(step.options or {})
-        step_options["timeout"] = timeout_val
-        step_options["profile"] = profile
-
-        with console.status(f"[bold #00ff66]⚡ RUNNING TOOL STEP {step.step_number}/{len(plan.execution_order)}: {tool_name} (Timeout: {timeout_val:.0f}s | Profile: {profile.upper()})...[/]"):
-            output = plugin.execute(target, step_options)
-            step_outputs.append(output)
-            duration = output.metadata.get("execution_time_ms", 0.0)
-            total_time_ms += duration
-
-            if output.status == "TIMED_OUT":
-                console.print(f"  [bold #ffff00]⏱️ {tool_name} TIMED OUT after {timeout_val:.0f}s (Partial findings preserved).[/]")
-            elif output.status == "COMPLETED":
-                console.print(f"  [bold #00ff66]✓ {tool_name} COMPLETED in {duration/1000.0:.2f}s ({len(output.findings)} findings).[/]")
-            else:
-                console.print(f"  [bold #ff0055]✗ {tool_name} STATUS: {output.status}[/]")
-
-    # Persist scan results
-    from memory.database import get_db_engine
-    import json
+    # Execute resilient workflow plan
+    scan_result = engine.execute_plan(
+        plan=plan,
+        authorized=True,
+        profile=profile,
+        max_concurrency=concurrency,
+        max_retries=retries,
+        resume_checkpoint_id=resume_id
+    )
 
     db = get_db_engine(cfg.database.db_url)
-    total_findings = sum(len(out.findings) for out in step_outputs)
-
-    raw_results = {
-        "target": target,
-        "profile": profile,
-        "step_results": [s.model_dump() for s in step_outputs]
-    }
+    raw_results = scan_result.model_dump()
 
     db.save_scan(
         target=target,
         plugins_used=plan.selected_plugins,
-        execution_time_ms=total_time_ms,
+        execution_time_ms=scan_result.total_duration_ms,
         status="COMPLETED",
         raw_results=raw_results,
-        summary={"steps_executed": len(step_outputs), "total_findings": total_findings, "profile": profile}
+        summary=scan_result.summary
     )
 
     clean_target = target.replace("://", "_").replace("/", "_").replace(":", "_")
@@ -299,12 +283,13 @@ def scan_command(
         json.dump(raw_results, f, indent=2)
 
     console.print(Panel(
-        f"[bold #00ff66]SCAN WORKFLOW COMPLETE[/]\n"
+        f"[bold #00ff66]RESILIENT WORKFLOW EXECUTION COMPLETE[/]\n"
         f"Target: [bold #ffff00]{target}[/]\n"
         f"Profile: [bold #ff007f]{profile.upper()}[/]\n"
-        f"Steps Executed: {len(step_outputs)}\n"
-        f"Total Duration: {total_time_ms / 1000.0:.2f} s\n"
-        f"Findings Discovered: [bold #00ff66]{total_findings}[/]\n"
+        f"Assessment Checkpoint: [cyan]{scan_result.assessment_id}[/]\n"
+        f"Steps Executed: {scan_result.summary.get('steps_executed', 0)}\n"
+        f"Total Duration: {scan_result.total_duration_ms / 1000.0:.2f} s\n"
+        f"Findings Discovered: [bold #00ff66]{scan_result.summary.get('total_findings', 0)}[/]\n"
         f"[dim]Record persisted to SQLite DB & saved to '{json_filename}'.[/dim]",
         title="[bold #00ffff]✅ EXECUTION SUMMARY[/]",
         border_style="#00ff66",
@@ -587,6 +572,320 @@ def generate_reports(
         box=box.DOUBLE,
         expand=False
     ))
+    console.print()
+
+
+@app.command("dashboard")
+def dashboard_command(
+    ctx: typer.Context,
+    target: str = typer.Option("127.0.0.1", "--target", "-t", help="Target scope for dashboard view."),
+    profile: str = typer.Option("deep", "--profile", "-p", help="Assessment profile.")
+):
+    """Render interactive cybersecurity operations terminal dashboard."""
+    from app.ui import create_ops_dashboard_layout
+
+    cfg: AppConfig = ctx.obj["config"]
+    layout = create_ops_dashboard_layout(
+        config=cfg,
+        target=target,
+        profile=profile,
+        evidence_count=42,
+        findings_count=8,
+        coverage_pct=76.0,
+        elapsed_seconds=45.2
+    )
+
+    console.clear()
+    console.print(layout)
+
+
+# ─── LLM SUBCOMMAND GROUP ───────────────────────────────────────────────────
+
+llm_app = typer.Typer(
+    name="llm",
+    help="🤖 Provider-Independent LLM Architecture Management Commands",
+    no_args_is_help=True
+)
+app.add_typer(llm_app, name="llm")
+
+
+@llm_app.command("providers")
+def llm_list_providers(ctx: typer.Context):
+    """List supported LLM providers, active endpoint configuration, and health status."""
+    from core.llm import get_llm_provider, list_registered_providers
+
+    cfg: AppConfig = ctx.obj["config"]
+    active_provider_name = cfg.llm.provider.lower().strip()
+
+    console.print("[bold #00ffff]┌──[ PROVIDER-INDEPENDENT LLM MATRIX ]──┐[/]\n")
+
+    table = Table(
+        title="[bold #00ff66]REGISTERED LLM PROVIDER BACKENDS[/]",
+        box=box.DOUBLE_EDGE,
+        header_style="bold #ff007f",
+        border_style="#00ffff"
+    )
+    table.add_column("Provider", style="#00ffff", width=16)
+    table.add_column("Active State", width=15)
+    table.add_column("Configured Endpoint", style="#ffff00")
+    table.add_column("Health Check", width=14)
+
+    for name in sorted(list_registered_providers()):
+        prov = get_llm_provider(name, config=cfg)
+        is_active = (name == active_provider_name)
+        active_str = "[bold #00ff66][SELECTED][/]" if is_active else "[dim][AVAILABLE][/]"
+        
+        endpoint = getattr(prov, "base_url", cfg.llm.api_endpoint)
+        health_ok = prov.health_check()
+        health_str = "[bold #00ff66][ONLINE][/]" if health_ok else "[bold #ff0055][OFFLINE][/]"
+
+        table.add_row(name, active_str, endpoint, health_str)
+
+    console.print(table)
+    console.print()
+
+
+@llm_app.command("models")
+def llm_list_models(
+    ctx: typer.Context,
+    provider: Optional[str] = typer.Option(None, "--provider", "-p", help="Specify provider to query models for (openrouter, openai, ollama).")
+):
+    """List available LLM models for the active or specified provider."""
+    from core.llm import get_llm_provider
+
+    cfg: AppConfig = ctx.obj["config"]
+    prov_name = provider or cfg.llm.provider
+    prov = get_llm_provider(prov_name, config=cfg)
+
+    console.print(f"\n[bold #00ffff]┌──[ AVAILABLE MODELS FOR PROVIDER: {prov.provider_name().upper()} ]──┐[/]\n")
+
+    with console.status(f"[bold #00ff66]⚡ Fetching model list from {prov.provider_name()}...[/]"):
+        models = prov.available_models()
+
+    table = Table(
+        box=box.DOUBLE_EDGE,
+        header_style="bold #ff007f",
+        border_style="#00ffff"
+    )
+    table.add_column("Index", style="dim", width=6)
+    table.add_column("Model Identifier", style="#00ff66")
+    table.add_column("Status", width=16)
+
+    for idx, model_id in enumerate(models, 1):
+        is_default = (model_id == cfg.llm.model)
+        status_str = "[bold #ffff00][ACTIVE DEFAULT][/]" if is_default else "[dim][AVAILABLE][/]"
+        table.add_row(str(idx), model_id, status_str)
+
+    console.print(table)
+    console.print()
+
+
+@llm_app.command("test")
+def llm_test_connection(
+    ctx: typer.Context,
+    prompt: str = typer.Option("Return a single line status statement confirming LLM operational health.", "--prompt", help="Custom test prompt text.")
+):
+    """Run connectivity health check and test completion prompt against active LLM provider."""
+    import time
+    from core.llm import get_llm_provider
+
+    cfg: AppConfig = ctx.obj["config"]
+    prov = get_llm_provider(config=cfg)
+
+    console.print(f"\n[bold #00ffff]┌──[ LLM PROVIDER DIAGNOSTIC & BENCHMARK TEST ]──┐[/]")
+    console.print(f"[bold #00ffff]Provider:[/] [bold #ffff00]{prov.provider_name()}[/] | [bold #00ffff]Model:[/] [bold #ff007f]{cfg.llm.model}[/]\n")
+
+    health_ok = prov.health_check()
+    if not health_ok:
+        console.print(f"[bold #ff0055]HEALTH CHECK WARNING:[/] Provider '{prov.provider_name()}' health check returned offline or unauthenticated state.")
+        console.print(f"[dim]Endpoint: {getattr(prov, 'base_url', cfg.llm.api_endpoint)}[/dim]\n")
+
+    with console.status(f"[bold #00ff66]⚡ Executing test completion request...[/]"):
+        start_time = time.perf_counter()
+        try:
+            response_text = prov.generate(prompt=prompt, temperature=0.2, max_tokens=200)
+            latency_ms = (time.perf_counter() - start_time) * 1000.0
+
+            console.print(Panel(
+                f"[#00ffff]Response Text:[/]\n{response_text.strip()}\n\n"
+                f"[dim]Latency: {latency_ms:.2f} ms | Provider: {prov.provider_name()} | Model: {cfg.llm.model}[/dim]",
+                title="[bold #00ff66]✅ TEST COMPLETION SUCCESSFUL[/]",
+                border_style="#00ff66",
+                box=box.DOUBLE,
+                expand=False
+            ))
+        except Exception as e:
+            latency_ms = (time.perf_counter() - start_time) * 1000.0
+            console.print(Panel(
+                f"[bold #ff0055]Completion Error:[/]\n{str(e)}\n\n"
+                f"[dim]Failed after {latency_ms:.2f} ms[/dim]",
+                title="[bold #ff0055]❌ TEST COMPLETION FAILED[/]",
+                border_style="#ff0055",
+                box=box.DOUBLE,
+                expand=False
+            ))
+    console.print()
+
+
+@llm_app.command("select")
+def llm_select_provider(
+    ctx: typer.Context,
+    provider: Optional[str] = typer.Option(None, "--provider", "-p", help="Provider name (openrouter, openai, ollama)."),
+    model: Optional[str] = typer.Option(None, "--model", "-m", help="Model identifier to set as active default.")
+):
+    """Switch active LLM provider and model settings."""
+    from core.llm import list_registered_providers, get_llm_provider
+
+    cfg: AppConfig = ctx.obj["config"]
+
+    selected_provider = provider
+    if not selected_provider:
+        providers = list_registered_providers()
+        console.print(f"[bold #00ffff]Available Providers:[/] {', '.join(providers)}")
+        selected_provider = typer.prompt("Select LLM Provider", default=cfg.llm.provider)
+
+    selected_provider = selected_provider.lower().strip()
+    if selected_provider not in list_registered_providers():
+        console.print(f"[bold #ff0055]ERROR:[/] Unknown provider '{selected_provider}'. Valid choices: {', '.join(list_registered_providers())}")
+        raise typer.Exit(code=1)
+
+    prov = get_llm_provider(selected_provider, config=cfg)
+
+    selected_model = model
+    if not selected_model:
+        avail_models = prov.available_models()
+        default_m = avail_models[0] if avail_models else cfg.llm.model
+        console.print(f"[bold #00ffff]Available Models for {selected_provider}:[/] {', '.join(avail_models[:5])}...")
+        selected_model = typer.prompt("Select LLM Model", default=default_m)
+
+    cfg.llm.provider = selected_provider
+    cfg.llm.model = selected_model
+
+    console.print(Panel(
+        f"[bold #00ff66]ACTIVE LLM SELECTION UPDATED[/]\n"
+        f"Provider: [bold #ffff00]{selected_provider}[/]\n"
+        f"Model: [bold #ff007f]{selected_model}[/]\n"
+        f"Endpoint: {getattr(prov, 'base_url', cfg.llm.api_endpoint)}",
+        title="[bold #00ffff]⚙️ CONFIGURATION CHANGED[/]",
+        border_style="#00ff66",
+        box=box.DOUBLE,
+        expand=False
+    ))
+    console.print()
+
+
+# ─── SECURITY TOOLS SUBCOMMAND GROUP ─────────────────────────────────────────
+
+tools_app = typer.Typer(
+    name="tools",
+    help="🛠️ Extensible Security-Tool Adapter Subsystem Commands",
+    no_args_is_help=True
+)
+app.add_typer(tools_app, name="tools")
+
+
+@tools_app.command("list")
+def tools_list_cmd(ctx: typer.Context):
+    """List registered security tool adapters, installation status, versions, and operational states."""
+    from core.adapters import get_adapter_registry
+
+    registry = get_adapter_registry()
+    adapters = registry.list_adapters()
+
+    console.print("[bold #00ffff]┌──[ EXTENSIBLE SECURITY TOOL MATRIX ]──┐[/]\n")
+
+    table = Table(
+        box=box.DOUBLE_EDGE,
+        header_style="bold #ff007f",
+        border_style="#00ffff"
+    )
+    table.add_column("Tool Name", style="#00ffff", width=16)
+    table.add_column("Category", style="#ffff00", width=20)
+    table.add_column("Installation Status", width=18)
+    table.add_column("Detected Version", style="dim")
+
+    for name, adapter in sorted(adapters.items()):
+        is_inst = adapter.is_installed()
+        status_str = "[bold #00ff66][INSTALLED][/]" if is_inst else "[bold #ffff00][NOT INSTALLED][/]"
+        ver_str = adapter.detect_version()
+
+        table.add_row(adapter.name, adapter.category, status_str, ver_str)
+
+    console.print(table)
+    console.print()
+
+
+@tools_app.command("info")
+def tools_info_cmd(
+    ctx: typer.Context,
+    tool_name: str = typer.Argument(..., help="Security tool adapter identifier name (e.g. nmap, owasp_zap, burp_suite, tshark, metasploit).")
+):
+    """Display detailed capability discovery, supported configuration options, and health metrics for a tool."""
+    from core.adapters import get_adapter_registry
+
+    registry = get_adapter_registry()
+    adapter = registry.get_adapter(tool_name)
+
+    if not adapter:
+        console.print(f"[bold #ff0055]ERROR:[/] Unknown security tool adapter '{tool_name}'.")
+        console.print(f"[dim]Available tools: {', '.join(sorted(registry.list_adapters().keys()))}[/dim]\n")
+        raise typer.Exit(code=1)
+
+    caps = adapter.discover_capabilities()
+    is_inst = adapter.is_installed()
+    version = adapter.detect_version()
+    health_ok = adapter.health_check()
+
+    console.print(f"\n[bold #00ffff]┌──[ ADAPTER METADATA: {adapter.name.upper()} ]──┐[/]\n")
+
+    tree = Tree(f"[bold #ff007f]{adapter.name}[/] [dim]({adapter.description})[/dim]")
+    tree.add(f"[#00ffff]Category:[/] {adapter.category}")
+    tree.add(f"[#00ffff]Installation Status:[/] {'[bold #00ff66]Installed[/]' if is_inst else '[bold #ffff00]Not Installed / Offline[/]'}")
+    tree.add(f"[#00ffff]Detected Version:[/] {version}")
+    tree.add(f"[#00ffff]Health Check:[/] {'[bold #00ff66][HEALTHY][/]' if health_ok else '[bold #ff0055][UNHEALTHY / OFFLINE][/]'}")
+
+    cap_node = tree.add("[bold #ffff00]Capabilities & Protocol Support[/]")
+    cap_node.add(f"[#00ffff]REST / RPC API Support:[/] {caps.supports_api}")
+    cap_node.add(f"[#00ffff]Asynchronous Execution:[/] {caps.supports_async}")
+    cap_node.add(f"[#00ffff]Target Authorization Check:[/] {caps.supports_auth}")
+    cap_node.add(f"[#00ffff]Assessment Categories:[/] {', '.join(caps.categories)}")
+
+    opt_node = tree.add("[bold #ffff00]Supported Options Schema[/]")
+    for opt_key, opt_desc in caps.supported_options.items():
+        opt_node.add(f"[#00ff66]{opt_key}:[/] {opt_desc}")
+
+    console.print(tree)
+    console.print()
+
+
+@tools_app.command("health")
+def tools_health_cmd(ctx: typer.Context):
+    """Perform real-time operational health checks across all registered security tool adapters."""
+    from core.adapters import get_adapter_registry
+
+    registry = get_adapter_registry()
+    adapters = registry.list_adapters()
+
+    console.print("[bold #00ffff]┌──[ SECURITY TOOL HEALTH DIAGNOSTICS ]──┐[/]\n")
+
+    table = Table(
+        box=box.DOUBLE_EDGE,
+        header_style="bold #ff007f",
+        border_style="#00ffff"
+    )
+    table.add_column("Tool", style="#00ffff", width=16)
+    table.add_column("Category", style="#ffff00", width=20)
+    table.add_column("Operational Health", width=20)
+    table.add_column("Version / Endpoint", style="dim")
+
+    for name, adapter in sorted(adapters.items()):
+        health_ok = adapter.health_check()
+        health_str = "[bold #00ff66][HEALTHY / ONLINE][/]" if health_ok else "[bold #ff0055][UNHEALTHY / OFFLINE][/]"
+        ver_str = adapter.detect_version()
+
+        table.add_row(adapter.name, adapter.category, health_str, ver_str)
+
+    console.print(table)
     console.print()
 
 
