@@ -3,7 +3,7 @@ MCP Server Registry and Tool Discovery Index.
 """
 
 from typing import Dict, List, Optional, Tuple
-from core.mcp.models import MCPServerConfig, MCPToolMetadata
+from core.mcp.models import MCPServerConfig, MCPToolMetadata, MCPToolCapabilities
 from core.mcp.client import MCPClient
 from core.logger import get_logger
 
@@ -17,6 +17,80 @@ class MCPServerRegistry:
         self._servers: Dict[str, MCPServerConfig] = {}
         self._clients: Dict[str, MCPClient] = {}
         self._tools: Dict[str, Tuple[str, MCPToolMetadata]] = {}  # tool_name -> (server_id, metadata)
+        self._register_default_mcp_servers()
+
+    def _register_default_mcp_servers(self) -> None:
+        """Initialize standard default MCP servers in registry."""
+        default_servers = [
+            MCPServerConfig(
+                server_id="network_mcp_server",
+                name="Network Recon MCP Subsystem",
+                transport="stdio",
+                command=["python3", "-m", "network_mcp"],
+                enabled=True
+            ),
+            MCPServerConfig(
+                server_id="web_mcp_server",
+                name="Web Assessment MCP Hub",
+                transport="http",
+                url="http://localhost:8000/mcp",
+                enabled=True
+            ),
+            MCPServerConfig(
+                server_id="analysis_mcp_server",
+                name="AI Triage & Analysis MCP Server",
+                transport="stdio",
+                command=["python3", "-m", "analysis_mcp"],
+                enabled=True
+            ),
+        ]
+
+        for s_cfg in default_servers:
+            self._servers[s_cfg.server_id] = s_cfg
+            self._clients[s_cfg.server_id] = MCPClient(s_cfg)
+
+        # Register standard default MCP tools into index
+        default_mcp_tools = [
+            MCPToolMetadata(
+                name="mcp_network_scanner",
+                description="MCP Network scanner tool module.",
+                category="network_recon",
+                version="1.0.0",
+                capabilities=MCPToolCapabilities(supports_async=True, supports_auth=True),
+                input_schema={"target": {"type": "string"}},
+                output_schema={"raw": {"type": "string"}},
+                health="HEALTHY",
+                enabled=True,
+                server_id="network_mcp_server"
+            ),
+            MCPToolMetadata(
+                name="mcp_web_analyzer",
+                description="MCP Web application security assessment module.",
+                category="web_assessment",
+                version="1.0.0",
+                capabilities=MCPToolCapabilities(supports_async=True, supports_auth=True),
+                input_schema={"target": {"type": "string"}},
+                output_schema={"raw": {"type": "string"}},
+                health="HEALTHY",
+                enabled=True,
+                server_id="web_mcp_server"
+            ),
+            MCPToolMetadata(
+                name="mcp_evidence_triage",
+                description="MCP Evidence analysis and vulnerability triage module.",
+                category="ai_analysis",
+                version="1.0.0",
+                capabilities=MCPToolCapabilities(supports_async=True, supports_auth=True),
+                input_schema={"target": {"type": "string"}},
+                output_schema={"raw": {"type": "string"}},
+                health="HEALTHY",
+                enabled=True,
+                server_id="analysis_mcp_server"
+            ),
+        ]
+
+        for t_meta in default_mcp_tools:
+            self.register_tool(t_meta)
 
     def register_server(self, config: MCPServerConfig, client: Optional[MCPClient] = None) -> bool:
         """Register an MCP server and discover its exposed tools."""

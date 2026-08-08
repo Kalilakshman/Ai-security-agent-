@@ -889,5 +889,103 @@ def tools_health_cmd(ctx: typer.Context):
     console.print()
 
 
+# ─── MCP SUBCOMMAND GROUP ───────────────────────────────────────────────────
+
+mcp_app = typer.Typer(
+    name="mcp",
+    help="🔌 Model Context Protocol (MCP) Integration Commands",
+    no_args_is_help=True
+)
+app.add_typer(mcp_app, name="mcp")
+
+
+@mcp_app.command("servers")
+def mcp_servers_cmd(ctx: typer.Context):
+    """List registered MCP servers and transport statuses."""
+    from core.mcp import get_mcp_registry
+
+    registry = get_mcp_registry()
+    servers = registry.list_servers()
+
+    console.print("[bold #00ffff]┌──[ MODEL CONTEXT PROTOCOL (MCP) SERVERS ]──┐[/]\n")
+
+    table = Table(
+        title="[bold #00ff66]REGISTERED MCP SERVER MATRIX[/]",
+        box=box.DOUBLE_EDGE,
+        header_style="bold #ff007f",
+        border_style="#00ffff"
+    )
+    table.add_column("Server ID", style="#00ffff", width=22)
+    table.add_column("Server Name", style="bold white", width=32)
+    table.add_column("Transport", style="#ffff00", width=12)
+    table.add_column("Status", width=16)
+
+    for sid, scfg in sorted(servers.items()):
+        status_str = "[bold #00ff66][ENABLED][/]" if scfg.enabled else "[bold #ff0055][DISABLED][/]"
+        table.add_row(sid, scfg.name, scfg.transport.upper(), status_str)
+
+    console.print(table)
+    console.print()
+
+
+@mcp_app.command("tools")
+def mcp_tools_cmd(ctx: typer.Context):
+    """List exposed MCP tools and capability metadata."""
+    from core.mcp import get_mcp_registry
+
+    registry = get_mcp_registry()
+    tools = registry.list_tools()
+
+    console.print("[bold #00ffff]┌──[ UNIFIED MCP TOOL INDEX ]──┐[/]\n")
+
+    table = Table(
+        box=box.DOUBLE_EDGE,
+        header_style="bold #ff007f",
+        border_style="#00ffff"
+    )
+    table.add_column("Tool Name", style="#00ffff", width=24)
+    table.add_column("Category", style="#ffff00", width=20)
+    table.add_column("Server ID", style="bold white", width=22)
+    table.add_column("Health Status", width=16)
+
+    for tool in sorted(tools, key=lambda x: x.name):
+        health_str = "[bold #00ff66][HEALTHY][/]" if tool.health == "HEALTHY" else "[bold #ff0055][UNHEALTHY][/]"
+        table.add_row(tool.name, tool.category, tool.server_id, health_str)
+
+    console.print(table)
+    console.print()
+
+
+@mcp_app.command("register")
+def mcp_register_cmd(
+    ctx: typer.Context,
+    server_id: str = typer.Option(..., "--id", "-i", help="Unique MCP server ID (e.g. custom_mcp)."),
+    name: str = typer.Option(..., "--name", "-n", help="Human-readable server name."),
+    transport: str = typer.Option("stdio", "--transport", "-t", help="Transport mode (stdio, http, sse)."),
+    command: Optional[str] = typer.Option(None, "--command", "-c", help="Process command for stdio transport."),
+    url: Optional[str] = typer.Option(None, "--url", "-u", help="HTTP URL for http/sse transport.")
+):
+    """Register a new MCP server in the orchestrator registry."""
+    from core.mcp import get_mcp_registry, MCPServerConfig
+
+    registry = get_mcp_registry()
+    cmd_list = command.split() if command else []
+
+    server_cfg = MCPServerConfig(
+        server_id=server_id,
+        name=name,
+        transport=transport.lower(),
+        command=cmd_list,
+        url=url,
+        enabled=True
+    )
+
+    success = registry.register_server(server_cfg)
+    if success:
+        console.print(f"[bold #00ff66]✓ Successfully registered MCP Server '{server_id}' ({name}).[/]")
+    else:
+        console.print(f"[bold #ff0055]✗ Failed to register MCP Server '{server_id}'. Check logs or connection.[/]")
+
+
 if __name__ == "__main__":
     app()

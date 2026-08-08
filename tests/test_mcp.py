@@ -185,3 +185,21 @@ def test_mcp_plugin_adapter_integration(sample_tool_metadata):
     assert output.target == "127.0.0.1"
     assert output.status == "COMPLETED"
     assert output.findings[0]["ports"] == [80, 443]
+
+
+def test_mcp_cli_commands(cli_runner):
+    """Test 'security-ai mcp' CLI subcommands (servers, tools, register)."""
+    from app.cli import app
+
+    res_servers = cli_runner.invoke(app, ["mcp", "servers"])
+    assert res_servers.exit_code == 0
+    assert "REGISTERED MCP SERVER MATRIX" in res_servers.output
+
+    res_tools = cli_runner.invoke(app, ["mcp", "tools"])
+    assert res_tools.exit_code == 0
+    assert "UNIFIED MCP TOOL INDEX" in res_tools.output
+
+    res_reg = cli_runner.invoke(app, ["mcp", "register", "-i", "test_server", "-n", "Test Server", "-t", "http", "-u", "http://localhost:9000"])
+    assert res_reg.exit_code == 0
+    assert "Successfully registered MCP Server" in res_reg.output
+
