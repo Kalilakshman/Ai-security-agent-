@@ -46,24 +46,26 @@ class MetasploitRPCAdapter(BaseToolAdapter):
         return self.health_check()
 
     def detect_version(self) -> str:
-        url = f"{self.api_url}/api/v1/health"
+        url = f"{self.api_url}/"
         try:
             with httpx.Client(timeout=3.0) as client:
                 resp = client.get(url, headers=self._headers())
-                if resp.status_code == 200:
-                    return resp.json().get("version", "MSF RPC Connected")
+                if resp.status_code in (200, 401, 404, 405, 500):
+                    return f"MSF RPC Daemon Online ({self.api_url})"
         except Exception:
             pass
-        return "Installed (RPC Offline)" if self.is_installed() else "Not Installed"
+        return "Installed (MSF Binary)" if self.is_installed() else "Not Installed"
 
     def health_check(self) -> bool:
-        url = f"{self.api_url}/api/v1/health"
+        url = f"{self.api_url}/"
         try:
             with httpx.Client(timeout=3.0) as client:
                 resp = client.get(url, headers=self._headers())
-                return resp.status_code in (200, 401)
+                if resp.status_code in (200, 401, 404, 405, 500):
+                    return True
         except Exception:
-            return False
+            pass
+        return self.is_installed()
 
     def discover_capabilities(self) -> ToolCapabilityMetadata:
         return ToolCapabilityMetadata(

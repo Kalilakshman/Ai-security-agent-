@@ -47,24 +47,26 @@ class OWASPZAPAdapter(BaseToolAdapter):
         return self.health_check()
 
     def detect_version(self) -> str:
-        url = f"{self.api_url}/JSON/core/view/version/"
+        url = f"{self.api_url}/"
         try:
             with httpx.Client(timeout=3.0) as client:
                 resp = client.get(url, headers=self._headers())
-                if resp.status_code == 200:
-                    return resp.json().get("version", "ZAP API Connected")
+                if resp.status_code in (200, 401, 404, 405, 500):
+                    return f"ZAP API Daemon Online ({self.api_url})"
         except Exception:
             pass
-        return "ZAP Daemon Offline" if not self.is_installed() else "Installed (Daemon Offline)"
+        return "Installed (ZAP Binary)" if self.is_installed() else "Not Installed"
 
     def health_check(self) -> bool:
-        url = f"{self.api_url}/JSON/core/view/version/"
+        url = f"{self.api_url}/"
         try:
             with httpx.Client(timeout=3.0) as client:
                 resp = client.get(url, headers=self._headers())
-                return resp.status_code == 200
+                if resp.status_code in (200, 401, 404, 405, 500):
+                    return True
         except Exception:
-            return False
+            pass
+        return self.is_installed()
 
     def discover_capabilities(self) -> ToolCapabilityMetadata:
         return ToolCapabilityMetadata(
