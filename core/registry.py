@@ -36,7 +36,7 @@ class PluginRegistry:
 
         # Iterate over all .py files in plugins directory
         for file in self.plugins_dir.glob("*.py"):
-            if file.name.startswith("_") or file.name in ("base.py", "manager.py"):
+            if file.name.startswith("_") or file.name in ("base.py", "manager.py", "mcp_adapter.py"):
                 continue
 
             module_name = f"plugins.{file.stem}"

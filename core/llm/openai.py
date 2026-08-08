@@ -27,7 +27,7 @@ class OpenAICompatibleProvider(LLMProvider):
             base_url = "https://api.openai.com/v1"
 
         self.base_url = base_url.rstrip("/")
-        self.api_key = self.llm_cfg.get_resolved_api_key() or os.getenv("OPENAI_API_KEY", "")
+        self.api_key = (self.llm_cfg.get_resolved_api_key() or os.getenv("OPENAI_API_KEY", "")).strip()
         self.model = self.llm_cfg.model if self.llm_cfg.model and not self.llm_cfg.model.startswith("nvidia/") else "gpt-4o-mini"
         self.timeout = self.llm_cfg.timeout_seconds
         self.temperature = self.llm_cfg.temperature

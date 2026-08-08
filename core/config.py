@@ -60,22 +60,22 @@ class LLMConfig(BaseModel):
         """Resolve API key from explicit setting, env vars, or fallback."""
         direct_key = self.api_key.get_secret_value() if self.api_key else ""
         if direct_key and direct_key != "YOUR_OPENROUTER_API_KEY_HERE":
-            return direct_key
+            return direct_key.strip()
 
         if self.provider == "openai":
             env_key = os.getenv("OPENAI_API_KEY")
             if env_key:
-                return env_key
+                return env_key.strip()
         elif self.provider == "openrouter":
             env_key = os.getenv("OPENROUTER_API_KEY")
             if env_key:
-                return env_key
+                return env_key.strip()
 
         env_generic = os.getenv("SECURITY_AI_LLM__API_KEY")
         if env_generic:
-            return env_generic
+            return env_generic.strip()
 
-        return direct_key
+        return direct_key.strip()
 
 
 class OpenRouterConfig(BaseModel):

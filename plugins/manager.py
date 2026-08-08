@@ -29,7 +29,7 @@ class PluginManager:
 
         found_modules = []
         for path in self.plugins_dir.glob("*.py"):
-            if path.name.startswith("_") or path.name in ("base.py", "manager.py"):
+            if path.name.startswith("_") or path.name in ("base.py", "manager.py", "mcp_adapter.py"):
                 continue
             found_modules.append(path.stem)
         return found_modules

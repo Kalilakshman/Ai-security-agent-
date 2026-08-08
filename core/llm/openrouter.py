@@ -23,7 +23,7 @@ class OpenRouterLLMProvider(LLMProvider):
         if not api_key:
             api_key = self.config.openrouter.api_key.get_secret_value()
 
-        self.api_key = api_key
+        self.api_key = (api_key or "").strip()
         self.base_url = (self.llm_cfg.api_endpoint or self.config.openrouter.base_url).rstrip("/")
         self.model = self.llm_cfg.model or self.config.openrouter.default_model
         self.fallback_model = self.llm_cfg.fallback_model or self.config.openrouter.fallback_model
