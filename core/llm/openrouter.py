@@ -92,6 +92,9 @@ class OpenRouterLLMProvider(LLMProvider):
 
         logger.debug(f"OpenRouter generate request (Model: {selected_model})")
 
+        if not self.api_key:
+            raise RuntimeError("OpenRouter API Key is missing. Export OPENROUTER_API_KEY environment variable or set llm.api_key in config.yaml.")
+
         with httpx.Client(timeout=self.timeout) as client:
             try:
                 response = client.post(url, headers=self._headers, json=payload)
@@ -123,6 +126,9 @@ class OpenRouterLLMProvider(LLMProvider):
         max_tokens: Optional[int] = None,
     ) -> str:
         """Asynchronously send completion request to OpenRouter API."""
+        if not self.api_key:
+            raise RuntimeError("OpenRouter API Key is missing. Export OPENROUTER_API_KEY environment variable or set llm.api_key in config.yaml.")
+
         selected_model = model or self.model
         temp = temperature if temperature is not None else self.temperature
         tokens = max_tokens if max_tokens is not None else self.max_tokens
@@ -159,6 +165,9 @@ class OpenRouterLLMProvider(LLMProvider):
 
     def health_check(self) -> bool:
         """Perform API health check against OpenRouter API."""
+        if not self.api_key:
+            logger.warning("OpenRouter health check failed: API key is missing.")
+            return False
         url = f"{self.base_url}/models"
         try:
             with httpx.Client(timeout=10.0) as client:
